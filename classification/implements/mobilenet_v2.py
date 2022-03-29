@@ -13,11 +13,11 @@ from typing import Any, Callable
 import jax.numpy as jnp
 from flax import linen as nn
 
-from implements.common_layer import InvertedResBlock, _make_divisible
+from common_layer import InvertedResBlock, _make_divisible
 
 ModuleDef = Any
 
-""" MobileNet V2 models for Flax.
+""" MobileNet v2 models for Flax.
     Reference:
         MobileNetV2: Inverted Residuals and Linear Bottlenecks
         https://arxiv.org/abs/1801.04381
