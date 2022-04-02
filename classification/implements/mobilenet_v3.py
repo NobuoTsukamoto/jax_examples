@@ -10,12 +10,11 @@
 from functools import partial
 from typing import Any, Callable, Tuple, Dict
 
-import jax
 import jax.numpy as jnp
 import jax.nn as jnn
 from flax import linen as nn
 
-from implements.common_layer import _make_divisible
+from .common_layer import _make_divisible
 
 ModuleDef = Any
 
@@ -77,7 +76,7 @@ class InvertedResBlock(nn.Module):
             SeBlock,
             filters=_make_divisible(in_filters * self.expansion),
             se_ratio=self.se_ratio,
-            conv=self.conv
+            conv=self.conv,
         )
 
         prefix = "block_{}_".format(self.block_id)
@@ -195,125 +194,36 @@ class MobileNetV3(nn.Module):
         return x
 
 
+# fmt: off
 Large = {
-    1: {
-        "exp": 1,
-        "filters": 16,
-        "kernel": (3, 3),
-        "strides": (1, 1),
-        "se_ratio": None,
-        "h_swish": False,
-    },
-    2: {
-        "exp": 4,
-        "filters": 24,
-        "kernel": (3, 3),
-        "strides": (2, 2),
-        "se_ratio": None,
-        "h_swish": False,
-    },
-    3: {
-        "exp": 3,
-        "filters": 24,
-        "kernel": (3, 3),
-        "strides": (1, 1),
-        "se_ratio": None,
-        "h_swish": False,
-    },
-    4: {
-        "exp": 3,
-        "filters": 40,
-        "kernel": (5, 5),
-        "strides": (2, 2),
-        "se_ratio": 0.25,
-        "h_swish": False,
-    },
-    5: {
-        "exp": 3,
-        "filters": 40,
-        "kernel": (5, 5),
-        "strides": (1, 1),
-        "se_ratio": 0.25,
-        "h_swish": False,
-    },
-    6: {
-        "exp": 3,
-        "filters": 40,
-        "kernel": (5, 5),
-        "strides": (1, 1),
-        "se_ratio": 0.25,
-        "h_swish": False,
-    },
-    7: {
-        "exp": 6,
-        "filters": 80,
-        "kernel": (3, 3),
-        "strides": (2, 2),
-        "se_ratio": None,
-        "h_swish": True,
-    },
-    8: {
-        "exp": 2.5,
-        "filters": 80,
-        "kernel": (3, 3),
-        "strides": (1, 1),
-        "se_ratio": None,
-        "h_swish": True,
-    },
-    9: {
-        "exp": 2.3,
-        "filters": 80,
-        "kernel": (3, 3),
-        "strides": (1, 1),
-        "se_ratio": None,
-        "h_swish": True,
-    },
-    10: {
-        "exp": 2.3,
-        "filters": 80,
-        "kernel": (3, 3),
-        "strides": (1, 1),
-        "se_ratio": None,
-        "h_swish": True,
-    },
-    11: {
-        "exp": 6,
-        "filters": 112,
-        "kernel": (3, 3),
-        "strides": (1, 1),
-        "se_ratio": 0.25,
-        "h_swish": True,
-    },
-    12: {
-        "exp": 6,
-        "filters": 112,
-        "kernel": (3, 3),
-        "strides": (1, 1),
-        "se_ratio": 0.25,
-        "h_swish": True,
-    },
-    13: {
-        "exp": 6,
-        "filters": 160,
-        "kernel": (5, 5),
-        "strides": (2, 2),
-        "se_ratio": 0.25,
-        "h_swish": True,
-    },
-    14: {
-        "exp": 6,
-        "filters": 160,
-        "kernel": (5, 5),
-        "strides": (1, 1),
-        "se_ratio": 0.25,
-        "h_swish": True,
-    },
-    15: {
-        "exp": 6,
-        "filters": 160,
-        "kernel": (5, 5),
-        "strides": (1, 1),
-        "se_ratio": 0.25,
-        "h_swish": True,
-    },
+    1: {"exp": 1, "filters": 16, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
+    2: {"exp": 4, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
+    3: {"exp": 3, "filters": 24, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
+    4: {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": False},
+    5: {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": False},
+    6: {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": False},
+    7: {"exp": 6, "filters": 80, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": True},
+    8: {"exp": 2.5, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
+    9: {"exp": 2.3, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
+    10: {"exp": 2.3, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
+    11: {"exp": 6, "filters": 112, "kernel": (3, 3), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    12: {"exp": 6, "filters": 112, "kernel": (3, 3), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    13: {"exp": 6, "filters": 160, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
+    14: {"exp": 6, "filters": 160, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    15: {"exp": 6, "filters": 160, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
 }
+
+Small = {
+    1: {"exp": 1, "filters": 16, "kernel": (3, 3), "strides": (2, 2), "se_ratio": 0.25, "h_swish": False},
+    2: {"exp": 4.5, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
+    3: {"exp": 88. / 24, "filters": 24, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
+    4: {"exp": 4, "filters": 40, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
+    5: {"exp": 6, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    6: {"exp": 6, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    7: {"exp": 3, "filters": 48, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    8: {"exp": 3, "filters": 48, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    9: {"exp": 6, "filters": 96, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
+    10: {"exp": 6, "filters": 96, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    11: {"exp": 6, "filters": 96, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+}
+# fmt: on

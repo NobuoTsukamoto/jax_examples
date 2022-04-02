@@ -13,7 +13,7 @@ from typing import Any, Callable
 import jax.numpy as jnp
 from flax import linen as nn
 
-from implements.common_layer import InvertedResBlock, _make_divisible
+from .common_layer import InvertedResBlock, _make_divisible
 
 ModuleDef = Any
 

@@ -9,13 +9,18 @@
 
 from functools import partial
 from implements.mobilenet_v2 import MobileNetV2
-from implements.mobilenet_v3 import MobileNetV3, Large
+from implements.mobilenet_v3 import MobileNetV3, Large, Small
 
 
 # MobileNetV2
 MobileNetV2_10 = partial(MobileNetV2, alpha=1.0)
 
-# MobieNetV3
+# MobieNetV3 Large
 MobileNetV3_Large = partial(
     MobileNetV3, alpha=1.0, layers=Large, last_block_filters=1280
+)
+
+# MobileNetV3 Small
+MobileNetV3_Small = partial(
+    MobileNetV3, alpha=1.0, layers=Small, last_block_filters=1024
 )
