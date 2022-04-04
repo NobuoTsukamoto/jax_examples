@@ -15,7 +15,7 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 
-from common_layer import InvertedResBlock
+from .common_layer import InvertedResBlock
 
 ModuleDef = Any
 
@@ -160,6 +160,8 @@ class FastSCNN(nn.Module):
         pyramid_pooling = partial(PyramidPooling, conv=conv, norm=norm, act=self.act)
         feature_fusion = partial(FeatureFusion, conv=conv, norm=norm, act=self.act)
 
+        batch, height, width, _ = x.shape
+
         # Learning to Down-sample
         x = conv(32, (3, 3), (2, 2), name="conv_init")(x)
         x = norm()(x)
@@ -192,5 +194,9 @@ class FastSCNN(nn.Module):
         x = depthwise_separable_conv(128, strides=(1, 1))(x)
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
         x = conv(self.num_classes, (1, 1))(x)
+
+        x = jax.image.resize(
+            x, shape=(batch, height, width, self.num_classes), method="bilinear"
+        )
 
         return x

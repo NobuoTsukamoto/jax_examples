@@ -1,13 +1,11 @@
 """Tests for flax.examples.imagenet.models."""
 
-from absl.testing import absltest
-from absl.testing import parameterized
-
 import jax
+from absl.testing import absltest, parameterized
+from clu import parameter_overview
 from jax import numpy as jnp
 
 from fast_scnn import FastSCNN
-
 
 jax.config.update("jax_disable_most_optimizations", True)
 
@@ -24,8 +22,6 @@ class FastSCNNTest(parameterized.TestCase):
         model_def = FastSCNN(num_classes=19, dtype=jnp.float32)
         variables = model_def.init(rngs, jnp.ones((1, 2048, 1024, 3), jnp.float32))
 
-        print(jax.tree_map(lambda x: x.shape, variables))
-        print(sum(x.size for x in jax.tree_leaves(variables)))
         self.assertLen(variables, 2)
         # Fast-SCNN model will create parameters for the following layers:
         #   Conv + BatchNorm = 2
@@ -36,6 +32,8 @@ class FastSCNNTest(parameterized.TestCase):
         #   DepthwiseSeparableConv = 2
         #   Conv = 1
         self.assertLen(variables["params"], 18)
+
+        print(parameter_overview.get_parameter_overview(variables))
 
 
 if __name__ == "__main__":
