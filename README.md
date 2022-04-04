@@ -13,19 +13,21 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 
 # Models
 
-## classification
+- [Classification](classification)
+- [Semantic Segmentation](segmentation)
+
+## Classification Task
 
 | Paper's | URL |
 |:-- |:--|
 | MobileNetV2: Inverted Residuals and Linear Bottlenecks | https://arxiv.org/abs/1801.04381 |
 | Searching for MobileNetV3 | https://arxiv.org/abs/1905.02244 |
 
-## segmentation
-W.I.P
+## Semantic Segmentation Task
 
 | Paper's | URL |
 |:-- |:--|
-|Fast-SCNN: Fast Semantic Segmentation Network | https://arxiv.org/abs/1902.04502
+|Fast-SCNN: Fast Semantic Segmentation Network | https://arxiv.org/abs/1902.04502 |
 
 # Installation
 W.I.P
