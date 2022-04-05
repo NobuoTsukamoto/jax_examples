@@ -35,12 +35,52 @@ class Augment(tf.keras.layers.Layer):
     def __init__(self, image_size=IMAGE_SIZE, seed=42):
         super().__init__()
         # both use the same seed, so they'll make the same random changes.
-        self.augment_inputs = tf.keras.layers.RandomFlip(mode="horizontal", seed=seed)
-        self.augment_labels = tf.keras.layers.RandomFlip(mode="horizontal", seed=seed)
+        self.inputs_random_flip = tf.keras.layers.RandomFlip(
+            mode="horizontal", seed=seed
+        )
+        self.inputs_random_zoom = tf.keras.layers.RandomZoom(
+            height_factor=(-1.0, 0.5),
+            fill_mode="constant",
+            interpolation="bilinear",
+            fill_value=0.0,
+            seed=seed,
+        )
+        self.inputs_random_translation = tf.keras.layers.RandomTranslation(
+            height_factor=0.2,
+            width_factor=0.2,
+            fill_mode="constant",
+            interpolation="bilinear",
+            fill_value=0.0,
+            seed=seed,
+        )
+
+        self.labels_random_flip = tf.keras.layers.RandomFlip(
+            mode="horizontal", seed=seed
+        )
+        self.labels_random_zoom = tf.keras.layers.RandomZoom(
+            height_factor=(-1.0, 0.5),
+            fill_mode="constant",
+            fill_value=0,
+            interpolation="nearest",
+            seed=seed,
+        )
+        self.labels_random_translation = tf.keras.layers.RandomTranslation(
+            height_factor=0.2,
+            width_factor=0.2,
+            fill_mode="constant",
+            interpolation="nearest",
+            fill_value=0,
+            seed=seed,
+        )
 
     def call(self, inputs, labels):
-        inputs = self.augment_inputs(inputs)
-        labels = self.augment_labels(labels)
+        inputs = self.inputs_random_translation(inputs)
+        inputs = self.inputs_random_zoom(inputs)
+        inputs = self.inputs_random_flip(inputs)
+
+        inputs = self.labels_random_translation(inputs)
+        inputs = self.labels_random_zoom(inputs)
+        inputs = self.labels_random_flip(inputs)
         return inputs, labels
 
 
@@ -53,9 +93,7 @@ def normalize_image(input_image, input_mask, dtype=tf.float32):
     input_mask = tf.cast(input_mask, dtype=tf.int32)
     input_mask = tf.where(input_mask >= 34, 34, input_mask)
     input_mask = tf.cast(tf.gather(LABEL_ID, input_mask), dtype=tf.uint8)
-    # input_mask = tf.image.convert_image_dtype(input_mask, tf.uint8)
 
-    # return {"image": input_image, "segmentation_mask": input_mask}
     return input_image, input_mask
 
 
@@ -95,24 +133,26 @@ def create_split(
 
         input_image, input_mask = normalize_image(input_image, input_mask, dtype=dtype)
 
-        return {"image": input_image, "segmentation_mask": input_mask}
+        return input_image, input_mask
 
-    ds = dataset_builder.as_dataset(split=split)
+    ds = dataset_builder.as_dataset(split=split).map(
+        load_image, num_parallel_calls=tf.data.AUTOTUNE
+    )
     options = tf.data.Options()
-    options.experimental_threading.private_threadpool_size = 48
+    options.threading.private_threadpool_size = 16
     ds = ds.with_options(options)
 
     if cache:
         ds = ds.cache()
 
     if train:
+        ds = ds.shuffle(32 * batch_size, seed=42)
+        ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
-        ds = ds.shuffle(16 * batch_size, seed=0)
-
-    ds = ds.map(load_image,  num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    ds = ds.batch(batch_size, drop_remainder=True)
+        ds = ds.map(Augment())
 
     if not train:
+        ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
 
     ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)

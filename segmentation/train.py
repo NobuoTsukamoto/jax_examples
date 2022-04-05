@@ -106,11 +106,11 @@ def train_step(state, batch, learning_rate_fn, num_classes, dropout_rng=None):
         """loss function used for training."""
         logits, new_model_state = state.apply_fn(
             {"params": params, "batch_stats": state.batch_stats},
-            batch["image"],
+            batch[0],
             mutable=["batch_stats"],
             rngs={"dropout": dropout_rng},
         )
-        loss = cross_entropy_loss(logits, batch["segmentation_mask"], num_classes)
+        loss = cross_entropy_loss(logits, batch[1], num_classes)
         weight_penalty_params = jax.tree_leaves(params)
         weight_decay = 0.0001
         weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
@@ -132,7 +132,7 @@ def train_step(state, batch, learning_rate_fn, num_classes, dropout_rng=None):
         # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
         grads = lax.pmean(grads, axis_name="batch")
     new_model_state, logits = aux[1]
-    metrics = compute_metrics(logits, batch["segmentation_mask"], num_classes)
+    metrics = compute_metrics(logits, batch[1], num_classes)
     metrics["learning_rate"] = lr
 
     new_state = state.apply_gradients(
@@ -158,8 +158,8 @@ def train_step(state, batch, learning_rate_fn, num_classes, dropout_rng=None):
 
 def eval_step(state, batch, num_classes):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
-    logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
-    return compute_metrics(logits, batch["segmentation_mask"], num_classes)
+    logits = state.apply_fn(variables, batch[0], train=False, mutable=False)
+    return compute_metrics(logits, batch[1], num_classes)
 
 
 def prepare_tf_data(xs):
