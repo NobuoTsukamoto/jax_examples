@@ -78,9 +78,9 @@ class Augment(tf.keras.layers.Layer):
         inputs = self.inputs_random_zoom(inputs)
         inputs = self.inputs_random_flip(inputs)
 
-        inputs = self.labels_random_translation(inputs)
-        inputs = self.labels_random_zoom(inputs)
-        inputs = self.labels_random_flip(inputs)
+        inputs = self.labels_random_translation(labels)
+        inputs = self.labels_random_zoom(labels)
+        labels = self.labels_random_flip(labels)
         return inputs, labels
 
 
