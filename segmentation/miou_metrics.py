@@ -35,7 +35,6 @@ def _calc_semantic_segmentation_confusion(pred_labels, gt_labels, num_classes):
     return batch_cm.sum(axis=0)
 
 
-@jax.jit
 def _calc_semantic_segmentation_iou(confusion):
     iou_denominator = (
         confusion.sum(axis=1) + confusion.sum(axis=0) - jnp.diag(confusion)

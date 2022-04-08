@@ -74,13 +74,14 @@ class Augment(tf.keras.layers.Layer):
         )
 
     def call(self, inputs, labels):
-        inputs = self.inputs_random_translation(inputs)
-        inputs = self.inputs_random_zoom(inputs)
+        # inputs = self.inputs_random_translation(inputs)
+        # inputs = self.inputs_random_zoom(inputs)
         inputs = self.inputs_random_flip(inputs)
 
-        labels = self.labels_random_translation(labels)
-        labels = self.labels_random_zoom(labels)
+        # labels = self.labels_random_translation(labels)
+        # labels = self.labels_random_zoom(labels)
         labels = self.labels_random_flip(labels)
+        labels = tf.cast(labels, dtype=tf.int32)
         return inputs, labels
 
 
@@ -133,7 +134,7 @@ def create_split(
 
         input_image, input_mask = normalize_image(input_image, input_mask, dtype=dtype)
 
-        return input_image, input_mask
+        return {"image": input_image, "label": input_mask}
 
     ds = dataset_builder.as_dataset(split=split).map(
         load_image, num_parallel_calls=tf.data.AUTOTUNE
@@ -149,7 +150,7 @@ def create_split(
         ds = ds.shuffle(32 * batch_size, seed=42)
         ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
-        ds = ds.map(Augment())
+        # ds = ds.map(Augment())
 
     if not train:
         ds = ds.batch(batch_size, drop_remainder=True)
