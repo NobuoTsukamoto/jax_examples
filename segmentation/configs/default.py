@@ -20,7 +20,7 @@ def get_config():
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
-    config.num_classes = 19
+    config.num_classes = 20
 
     # Training param
     config.learning_rate = 0.1
