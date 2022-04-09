@@ -141,7 +141,7 @@ class FastSCNN(nn.Module):
     dtype: Any = jnp.float32
     conv: ModuleDef = nn.Conv
     act: Callable = nn.relu
-    dropout_rate: float = 0.3
+    dropout_rate: float = 0.1
 
     @nn.compact
     def __call__(self, x, train: bool = True):

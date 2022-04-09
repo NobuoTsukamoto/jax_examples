@@ -72,7 +72,6 @@ def compute_metrics(logits, labels, num_classes):
     accuracy = jnp.mean(jnp.argmax(logits, axis=-1, keepdims=True) == labels)
     miou = miou_metrics(logits, labels, num_classes)
     metrics = {"loss": loss, "accuracy": accuracy, "miou": miou["miou"]}
-    # metrics = {"loss": loss, "accuracy": accuracy}
     metrics = lax.pmean(metrics, axis_name="batch")
     return metrics
 
@@ -169,7 +168,7 @@ def prepare_tf_data(xs):
     def _prepare(x):
         # Use _numpy() for zero-copy conversion between TF and NumPy.
         x = x._numpy()
-    
+
         # reshape (host_batch_size, height, width, 3) to
         # (local_devices, device_batch_size, height, width, 3)
         return x.reshape((local_device_count, -1) + x.shape[1:])
@@ -403,7 +402,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
                 epoch,
                 summary["loss"],
                 summary["accuracy"] * 100,
-                summary["miou"]
+                summary["miou"],
             )
             writer.write_scalars(
                 step + 1, {f"eval_{key}": val for key, val in summary.items()}

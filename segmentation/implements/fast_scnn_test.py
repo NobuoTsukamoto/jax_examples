@@ -16,8 +16,8 @@ class FastSCNNTest(parameterized.TestCase):
     def test_fast_scnn_model(self):
         """Tests Fast-SCNN model definition and output (variables)."""
         rngs = {
-            'params': jax.random.PRNGKey(0),
-            'dropout': jax.random.PRNGKey(1),
+            "params": jax.random.PRNGKey(0),
+            "dropout": jax.random.PRNGKey(1),
         }
         model_def = FastSCNN(num_classes=19, dtype=jnp.float32)
         variables = model_def.init(rngs, jnp.ones((1, 2048, 1024, 3), jnp.float32))
@@ -33,6 +33,28 @@ class FastSCNNTest(parameterized.TestCase):
         #   Conv = 1
         self.assertLen(variables["params"], 18)
 
+        print(parameter_overview.get_parameter_overview(variables))
+
+    def test_fast_scnn_1024_512_model(self):
+        """Tests Fast-SCNN model definition and output (variables)."""
+        rngs = {
+            "params": jax.random.PRNGKey(0),
+            "dropout": jax.random.PRNGKey(1),
+        }
+        model_def = FastSCNN(num_classes=19, dtype=jnp.float32)
+        variables = model_def.init(rngs, jnp.ones((1, 1024, 512, 3), jnp.float32))
+
+        self.assertLen(variables, 2)
+        # Fast-SCNN model will create parameters for the following layers:
+        #   Conv + BatchNorm = 2
+        #   DepthwiseSeparableConv = 2
+        #   Bottleneck = 9
+        #   PPM = 1
+        #   FFM = 1
+        #   DepthwiseSeparableConv = 2
+        #   Conv = 1
+        self.assertLen(variables["params"], 18)
+        
         print(parameter_overview.get_parameter_overview(variables))
 
 
