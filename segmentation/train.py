@@ -24,11 +24,15 @@ from flax import jax_utils
 from flax.optim import dynamic_scale as dynamic_scale_lib
 from flax.training import checkpoints, common_utils, train_state
 from jax import lax
+import numpy as np
 
 import input_pipeline
 import models
 
 from miou_metrics import eval_semantic_segmentation
+from jax.config import config
+
+config.update("jax_disable_jit", True)
 
 
 def create_model(*, model_cls, half_precision, num_classes, **kwargs):
@@ -71,7 +75,13 @@ def compute_metrics(logits, labels, num_classes):
     loss = cross_entropy_loss(logits, labels, num_classes)
     accuracy = jnp.mean(jnp.argmax(logits, axis=-1, keepdims=True) == labels)
     miou = miou_metrics(logits, labels, num_classes)
-    metrics = {"loss": loss, "accuracy": accuracy, "miou": miou["miou"]}
+    metrics = {
+        "loss": loss,
+        "accuracy": accuracy,
+        "miou": miou["miou"],
+        "pixel_accuracy": miou["pixel_accuracy"],
+        "class_accuracy": miou["mean_class_accuracy"],
+    }
     metrics = lax.pmean(metrics, axis_name="batch")
     return metrics
 
@@ -391,10 +401,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
 
             # sync batch statistics across replicas
             state = sync_batch_stats(state)
-            for _ in range(steps_per_eval):
+            for i in range(steps_per_eval):
                 eval_batch = next(eval_iter)
                 metrics = p_eval_step(state, eval_batch)
                 eval_metrics.append(metrics)
+
             eval_metrics = common_utils.get_metrics(eval_metrics)
             summary = jax.tree_map(lambda x: x.mean(), eval_metrics)
             logging.info(

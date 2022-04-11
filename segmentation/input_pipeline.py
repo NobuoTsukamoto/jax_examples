@@ -6,6 +6,7 @@
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
+from random import Random
 import numpy as np
 import jax
 import tensorflow as tf
@@ -17,7 +18,7 @@ import tensorflow_datasets as tfds
         https://github.com/google/flax/blob/main/examples/imagenet/input_pipeline.py
 """
 
-IMAGE_SIZE = (2048, 1024)
+IMAGE_SIZE = (1024, 2048)
 MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
 STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
 
@@ -32,58 +33,43 @@ LABEL_ID = np.asarray([0, 0, 0, 0, 0, 0,
 
 
 class Augment(tf.keras.layers.Layer):
-    def __init__(self, image_size=IMAGE_SIZE, seed=42, dtype=tf.float32, training=True):
+    def __init__(self, height=512, width=1024, seed=42, dtype=tf.float32):
         super().__init__()
+        self.image_size = (1024, 2048)
         self.input_dtype = dtype
-        # both use the same seed, so they'll make the same random changes.
+        self.random_resize_factor = Random(seed)
         self.inputs_random_flip = tf.keras.layers.RandomFlip(
             mode="horizontal", seed=seed
         )
-        self.inputs_random_zoom = tf.keras.layers.RandomZoom(
-            height_factor=(-1.0, 0.5),
-            fill_mode="constant",
-            interpolation="bilinear",
-            fill_value=0.0,
-            seed=seed,
+        self.inputs_random_crop = tf.keras.layers.RandomCrop(
+            height=height, width=width, seed=seed
         )
-        self.inputs_random_translation = tf.keras.layers.RandomTranslation(
-            height_factor=0.25,
-            width_factor=0.25,
-            fill_mode="constant",
-            interpolation="bilinear",
-            fill_value=0.0,
-            seed=seed,
-        )
-
         self.labels_random_flip = tf.keras.layers.RandomFlip(
             mode="horizontal", seed=seed
         )
-        self.labels_random_zoom = tf.keras.layers.RandomZoom(
-            height_factor=(-1.0, 0.5),
-            fill_mode="constant",
-            fill_value=0,
-            interpolation="nearest",
-            seed=seed,
-        )
-        self.labels_random_translation = tf.keras.layers.RandomTranslation(
-            height_factor=0.25,
-            width_factor=0.25,
-            fill_mode="constant",
-            interpolation="nearest",
-            fill_value=0,
-            seed=seed,
+        self.labels_random_crop = tf.keras.layers.RandomCrop(
+            height=height, width=width, seed=seed
         )
 
     def call(self, inputs, labels):
-        inputs = self.inputs_random_translation(inputs)
-        inputs = self.inputs_random_zoom(inputs)
+        resize_factor = self.random_resize_factor.uniform(0.5, 2.0)
+        new_height = int(self.image_size[0] * resize_factor)
+        new_width = int(self.image_size[1] * resize_factor)
+
+        inputs = tf.image.resize(
+            inputs, (new_height, new_width), method=tf.image.ResizeMethod.BILINEAR
+        )
+        inputs = self.inputs_random_crop(inputs)
         inputs = self.inputs_random_flip(inputs)
 
-        labels = self.labels_random_translation(labels)
-        labels = self.labels_random_zoom(labels)
+        labels = tf.image.resize(
+            labels,
+            (new_height, new_width),
+            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+        )
+        labels = self.labels_random_crop(labels)
         labels = self.labels_random_flip(labels)
-
-        inputs, labels = normalize_image(inputs, labels, dtype=self.input_dtype)
+        labels = tf.cast(labels, dtype=tf.int32)
 
         return {"image": inputs, "label": labels}
 
@@ -130,23 +116,36 @@ def create_split(
         start = jax.process_index() * split_size
         split = "validation[{}:{}]".format(start, start + split_size)
 
-    def load_image(datapoint):
+    def load_image_train(datapoint):
         input_image = datapoint["image_left"]
         input_mask = datapoint["segmentation_label"]
-        if train:
-            return input_image, input_mask
+        input_image, input_mask = normalize_image(input_image, input_mask, dtype=dtype)
+        return input_image, input_mask
 
-        else:
-            input_image, input_mask = normalize_image(
-                input_image, input_mask, dtype=dtype
-            )
-            input_image = tf.image.convert_image_dtype(input_image, dtype)
-            input_mask = tf.cast(input_mask, dtype=tf.int32)
-            return {"image": input_image, "label": input_mask}
+    def load_image_val(datapoint):
+        input_image = datapoint["image_left"]
+        input_mask = datapoint["segmentation_label"]
 
-    ds = dataset_builder.as_dataset(split=split).map(
-        load_image, num_parallel_calls=tf.data.AUTOTUNE
-    )
+        input_image, input_mask = normalize_image(input_image, input_mask, dtype=dtype)
+        input_image = tf.image.resize(
+            input_image, image_size, method=tf.image.ResizeMethod.BILINEAR
+        )
+        input_image = tf.image.convert_image_dtype(input_image, dtype)
+        input_mask = tf.image.resize(
+            input_mask, image_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
+        )
+        input_mask = tf.cast(input_mask, dtype=tf.int32)
+        return {"image": input_image, "label": input_mask}
+
+    if train:
+        ds = dataset_builder.as_dataset(split=split).map(
+            load_image_train, num_parallel_calls=tf.data.AUTOTUNE
+        )
+    else:
+        ds = dataset_builder.as_dataset(split=split).map(
+            load_image_val, num_parallel_calls=tf.data.AUTOTUNE
+        )
+
     options = tf.data.Options()
     options.threading.private_threadpool_size = 16
     ds = ds.with_options(options)

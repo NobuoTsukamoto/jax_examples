@@ -16,7 +16,8 @@ def get_config():
 
     # As defined in the `models` module.
     config.model = "Fast_SCNN"
-    config.image_size = (1024, 2048)
+    # config.image_size = (1024, 2048)
+    config.image_size = (512, 1024)
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
@@ -26,9 +27,9 @@ def get_config():
     config.learning_rate = 0.1
     config.warmup_epochs = 5.0
     config.momentum = 0.9
-    config.batch_size = 4
+    config.batch_size = 16
 
-    config.num_epochs = 100.0
+    config.num_epochs = 1000.0
     config.log_every_steps = 100
 
     config.cache = False

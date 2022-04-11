@@ -82,12 +82,13 @@ class PyramidPooling(nn.Module):
         batch, height, width, channels = x.shape
         filters = channels // len(self.bin_sizes)
         concat_list = [x]
+        inputs = x
 
         for bin_size in self.bin_sizes:
             x = nn.avg_pool(
-                x, window_shape=(bin_size, bin_size), strides=(bin_size, bin_size)
+                inputs, window_shape=(bin_size, bin_size), strides=(bin_size, bin_size)
             )
-            x = self.conv(filters, (1, 1))(x)
+            x = self.conv(filters, kernel_size=(1, 1))(x)
             x = self.norm()(x)
             x = self.act(x)
             x = jax.image.resize(
@@ -104,6 +105,7 @@ class PyramidPooling(nn.Module):
 class FeatureFusion(nn.Module):
     """Feature Fusion Module."""
 
+    depthwise_separable_conv: ModuleDef
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
     act: Callable = nn.relu
@@ -118,11 +120,9 @@ class FeatureFusion(nn.Module):
         y = jax.image.resize(
             y, shape=(batch, x_height, x_width, channels), method="bilinear"
         )
-        y = self.conv(
+        y = self.depthwise_separable_conv(
             128,
-            kernel_size=(3, 3),
-            strides=(1, 1),
-            kernel_dilation=(x_height // y_height, x_width // y_width),
+            dilation=(x_height // y_height, x_width // y_width),
         )(y)
         y = self.norm()(y)
         y = self.act(y)
@@ -130,7 +130,7 @@ class FeatureFusion(nn.Module):
         y = self.norm()(y)
 
         x = x + y
-        x = self.act(y)
+        x = self.act(x)
         return x
 
 
@@ -158,12 +158,18 @@ class FastSCNN(nn.Module):
             InvertedResBlock, alpha=1.0, conv=conv, norm=norm, act=self.act
         )
         pyramid_pooling = partial(PyramidPooling, conv=conv, norm=norm, act=self.act)
-        feature_fusion = partial(FeatureFusion, conv=conv, norm=norm, act=self.act)
+        feature_fusion = partial(
+            FeatureFusion,
+            depthwise_separable_conv=depthwise_separable_conv,
+            conv=conv,
+            norm=norm,
+            act=self.act,
+        )
 
         batch, height, width, _ = x.shape
 
         # Learning to Down-sample
-        x = conv(32, (3, 3), (2, 2), name="conv_init")(x)
+        x = conv(32, kernel_size=(3, 3), strides=(2, 2), name="conv_init")(x)
         x = norm()(x)
         x = self.act(x)
         x = depthwise_separable_conv(48, strides=(2, 2))(x)
@@ -172,28 +178,28 @@ class FastSCNN(nn.Module):
         # Global Feature Extractor
         y = x
 
-        y = bottlenck(filters=64, strides=(2, 2), expansion=6, block_id=0)(y)
-        y = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=1)(y)
-        y = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=2)(y)
+        x = bottlenck(filters=64, strides=(2, 2), expansion=6, block_id=0)(x)
+        x = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=1)(x)
+        x = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=2)(x)
 
-        y = bottlenck(filters=96, strides=(2, 2), expansion=6, block_id=3)(y)
-        y = bottlenck(filters=96, strides=(1, 1), expansion=6, block_id=4)(y)
-        y = bottlenck(filters=96, strides=(1, 1), expansion=6, block_id=5)(y)
+        x = bottlenck(filters=96, strides=(2, 2), expansion=6, block_id=3)(x)
+        x = bottlenck(filters=96, strides=(1, 1), expansion=6, block_id=4)(x)
+        x = bottlenck(filters=96, strides=(1, 1), expansion=6, block_id=5)(x)
 
-        y = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=6)(y)
-        y = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=7)(y)
-        y = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=8)(y)
+        x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=6)(x)
+        x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=7)(x)
+        x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=8)(x)
 
-        y = pyramid_pooling()(y)
+        x = pyramid_pooling()(x)
 
         # Feature Fusion
-        x = feature_fusion()(x, y)
+        x = feature_fusion()(y, x)  # high res, low res
 
         # Classifier
         x = depthwise_separable_conv(128, strides=(1, 1))(x)
         x = depthwise_separable_conv(128, strides=(1, 1))(x)
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
-        x = conv(self.num_classes, (1, 1))(x)
+        x = conv(self.num_classes, kernel_size=(1, 1))(x)
 
         x = jax.image.resize(
             x, shape=(batch, height, width, self.num_classes), method="bilinear"
