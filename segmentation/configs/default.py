@@ -21,15 +21,15 @@ def get_config():
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
-    config.num_classes = 20
+    config.num_classes = 19
 
     # Training param
     config.learning_rate = 0.1
-    config.warmup_epochs = 5.0
+    config.warmup_epochs = 10.0
     config.momentum = 0.9
-    config.batch_size = 16
+    config.batch_size = 8
 
-    config.num_epochs = 1000.0
+    config.num_epochs = 200.0
     config.log_every_steps = 100
 
     config.cache = False
@@ -39,4 +39,6 @@ def get_config():
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
     config.num_train_steps = -1
     config.steps_per_eval = -1
+
+    config.ignore_label = 255
     return config

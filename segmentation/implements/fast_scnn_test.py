@@ -20,7 +20,7 @@ class FastSCNNTest(parameterized.TestCase):
             "dropout": jax.random.PRNGKey(1),
         }
         model_def = FastSCNN(num_classes=19, dtype=jnp.float32)
-        variables = model_def.init(rngs, jnp.ones((1, 2048, 1024, 3), jnp.float32))
+        variables = model_def.init(rngs, jnp.ones((1, 1024, 2048, 3), jnp.float32))
 
         self.assertLen(variables, 2)
         # Fast-SCNN model will create parameters for the following layers:

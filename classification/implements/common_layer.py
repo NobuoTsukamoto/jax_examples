@@ -88,3 +88,46 @@ class InvertedResBlock(nn.Module):
             x = x + inputs
 
         return x
+
+
+class DepthwiseSeparable(nn.Module):
+    """DepthwiseSeparableConv"""
+
+    conv: ModuleDef
+    norm: ModuleDef
+    act: Callable
+    out_features: int
+    depth_multiplier: float = 1.0
+    alpha: float = 1.0
+    dw_kernel_size: Tuple[int, int] = (3, 3)
+    pw_kernel_size: Tuple[int, int] = (1, 1)
+    strides: Tuple[int, int] = (1, 1)
+    dilation: Tuple[int, int] = (1, 1)
+    pad_type: str = "SAME"
+
+    @nn.compact
+    def __call__(self, x):
+        in_features = int(x.shape[-1] * self.depth_multiplier)
+
+        x = self.conv(
+            in_features,
+            self.dw_kernel_size,
+            strides=self.strides,
+            kernel_dilation=self.dilation,
+            feature_group_count=in_features,
+            padding=self.pad_type,
+            name="dw_conv",
+        )(x)
+        x = self.norm(name="dw_bn")(x)
+        x = self.act(x)
+
+        x = self.conv(
+            int(self.out_features * self.alpha),
+            self.pw_kernel_size,
+            padding=self.pad_type,
+            name="pw_conv",
+        )(x)
+        x = self.norm(name="pw_bn")(x)
+        x = self.act(x)
+
+        return x

@@ -23,12 +23,13 @@ MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
 STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
 
 # fmt: off
-LABEL_ID = np.asarray([0, 0, 0, 0, 0, 0,
-                       0, 1, 2, 0, 0, 3,
-                       4, 5, 0, 0, 0, 6,
-                       0, 7, 8, 9, 10, 11,
-                       12, 13, 14, 15, 16, 0,
-                       0, 17, 18, 19, 0], dtype=np.int32)
+# https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py#L52-L99
+LABEL_ID = np.asarray([255, 255, 255, 255, 255, 255,
+                       255,   0,   1, 255, 255,   2,
+                         3,   4, 255, 255, 255,   5,
+                       255,   6,   7,   8,   9,  10,
+                        11,  12,  13,  14,  15, 255,
+                       255,  16,  17,  18, 255], dtype=np.int32)
 # fmt: on
 
 
@@ -50,9 +51,12 @@ class Augment(tf.keras.layers.Layer):
         self.labels_random_crop = tf.keras.layers.RandomCrop(
             height=height, width=width, seed=seed
         )
+        self.inputs_random_contrast = tf.keras.layers.RandomContrast(
+            factor=0.4, seed=seed
+        )
 
     def call(self, inputs, labels):
-        resize_factor = self.random_resize_factor.uniform(0.5, 2.0)
+        resize_factor = self.random_resize_factor.uniform(0.5, 1.5)
         new_height = int(self.image_size[0] * resize_factor)
         new_width = int(self.image_size[1] * resize_factor)
 
@@ -61,6 +65,7 @@ class Augment(tf.keras.layers.Layer):
         )
         inputs = self.inputs_random_crop(inputs)
         inputs = self.inputs_random_flip(inputs)
+        inputs = self.inputs_random_contrast(inputs)
 
         labels = tf.image.resize(
             labels,
@@ -69,7 +74,8 @@ class Augment(tf.keras.layers.Layer):
         )
         labels = self.labels_random_crop(labels)
         labels = self.labels_random_flip(labels)
-        labels = tf.cast(labels, dtype=tf.int32)
+
+        inputs, labels = normalize_image(inputs, labels, dtype=self.dtype)
 
         return {"image": inputs, "label": labels}
 
@@ -80,8 +86,8 @@ def normalize_image(input_image, input_mask, dtype=tf.float32):
     input_image /= tf.constant(STDDEV_RGB, shape=[1, 1, 3], dtype=input_image.dtype)
 
     input_mask = tf.cast(input_mask, dtype=tf.int32)
-    input_mask = tf.where(input_mask >= 34, 34, input_mask)
-    input_mask = tf.cast(tf.gather(LABEL_ID, input_mask), dtype=tf.int32)
+    # input_mask = tf.where(input_mask >= 34, 34, input_mask)
+    input_mask = tf.cast(tf.gather(LABEL_ID, tf.cast(input_mask, dtype=tf.int32)), dtype=tf.uint8)
 
     return input_image, input_mask
 
@@ -93,6 +99,7 @@ def create_split(
     dtype=tf.float32,
     image_size=IMAGE_SIZE,
     cache=False,
+    ignore_label=255,
 ):
     """Creates a split from the ImageNet dataset using TensorFlow Datasets.
     Args:
@@ -102,6 +109,7 @@ def create_split(
         dtype: data type of the image.
         image_size: The target size of the images.
         cache: Whether to cache the dataset.
+        ignore_label: ignore label.
     Returns:
         A `tf.data.Dataset`.
     """
@@ -119,7 +127,6 @@ def create_split(
     def load_image_train(datapoint):
         input_image = datapoint["image_left"]
         input_mask = datapoint["segmentation_label"]
-        input_image, input_mask = normalize_image(input_image, input_mask, dtype=dtype)
         return input_image, input_mask
 
     def load_image_val(datapoint):

@@ -34,6 +34,8 @@ from jax.config import config
 
 config.update("jax_disable_jit", True)
 
+EPSILON = 1e-5
+
 
 def create_model(*, model_cls, half_precision, num_classes, **kwargs):
     platform = jax.local_devices()[0].platform
@@ -58,30 +60,44 @@ def initialized(key, image_size, model):
     return variables["params"], variables["batch_stats"]
 
 
-def cross_entropy_loss(logits, labels, num_classes):
-    one_hot_labels = common_utils.onehot(labels, num_classes=num_classes)
-    one_hot_labels = jnp.squeeze(one_hot_labels, axis=3)
+def cross_entropy_loss(logits, labels, num_classes, ignore_label):
+    # https://github.com/tensorflow/models/blob/c44482ab303f6a13b33048ca6058877c06a6a2d1/official/vision/losses/segmentation_losses.py#L36
+
+    valid_mask = jnp.not_equal(labels, ignore_label)
+    labels = jnp.where(valid_mask, labels, jnp.zeros_like(labels))
+    normalizer = jnp.sum(valid_mask.astype(jnp.float32), dtype=jnp.float32) + EPSILON
+
+    one_hot_labels = jnp.squeeze(
+        common_utils.onehot(labels, num_classes=num_classes), axis=3
+    )
     xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
-    return jnp.mean(xentropy)
+
+    class_weights = jnp.ones(num_classes, dtype=jnp.float32)
+    weight_mask = jnp.einsum(
+        "...y,y->...",
+        common_utils.onehot(labels, num_classes=num_classes),
+        class_weights,
+    )
+    valid_mask *= weight_mask
+    xentropy *= jnp.squeeze(valid_mask, axis=-1).astype(jnp.float32)
+    return jnp.sum(xentropy) / normalizer
+    # return jnp.mean(xentropy)
 
 
-def miou_metrics(logits, labels, num_classes):
+def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
     return eval_semantic_segmentation(
-        jnp.argmax(logits, axis=-1), jnp.squeeze(labels, axis=-1), num_classes
+        jnp.argmax(logits, axis=-1),
+        jnp.squeeze(labels, axis=-1),
+        num_classes,
+        ignore_label,
     )
 
 
-def compute_metrics(logits, labels, num_classes):
-    loss = cross_entropy_loss(logits, labels, num_classes)
-    accuracy = jnp.mean(jnp.argmax(logits, axis=-1, keepdims=True) == labels)
-    miou = miou_metrics(logits, labels, num_classes)
-    metrics = {
-        "loss": loss,
-        "accuracy": accuracy,
-        "miou": miou["miou"],
-        "pixel_accuracy": miou["pixel_accuracy"],
-        "class_accuracy": miou["mean_class_accuracy"],
-    }
+def compute_metrics(logits, labels, num_classes, ignore_label):
+    loss = cross_entropy_loss(logits, labels, num_classes, ignore_label)
+    # accuracy = jnp.mean(jnp.argmax(logits, axis=-1, keepdims=True) == labels)
+    metrics = semantic_segmentation_metrics(logits, labels, num_classes, ignore_label)
+    metrics["loss"] = loss
     metrics = lax.pmean(metrics, axis_name="batch")
     return metrics
 
@@ -106,7 +122,9 @@ def create_learning_rate_fn(
     return schedule_fn
 
 
-def train_step(state, batch, learning_rate_fn, num_classes, dropout_rng=None):
+def train_step(
+    state, batch, learning_rate_fn, num_classes, ignore_label, dropout_rng=None
+):
     """Perform a single training step."""
 
     dropout_rng, new_dropout_rng = jax.random.split(dropout_rng)
@@ -119,7 +137,7 @@ def train_step(state, batch, learning_rate_fn, num_classes, dropout_rng=None):
             mutable=["batch_stats"],
             rngs={"dropout": dropout_rng},
         )
-        loss = cross_entropy_loss(logits, batch["label"], num_classes)
+        loss = cross_entropy_loss(logits, batch["label"], num_classes, ignore_label)
         weight_penalty_params = jax.tree_leaves(params)
         weight_decay = 0.0001
         weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
@@ -141,7 +159,7 @@ def train_step(state, batch, learning_rate_fn, num_classes, dropout_rng=None):
         # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
         grads = lax.pmean(grads, axis_name="batch")
     new_model_state, logits = aux[1]
-    metrics = compute_metrics(logits, batch["label"], num_classes)
+    metrics = compute_metrics(logits, batch["label"], num_classes, ignore_label)
     metrics["learning_rate"] = lr
 
     new_state = state.apply_gradients(
@@ -165,10 +183,10 @@ def train_step(state, batch, learning_rate_fn, num_classes, dropout_rng=None):
     return new_state, metrics, new_dropout_rng
 
 
-def eval_step(state, batch, num_classes):
+def eval_step(state, batch, num_classes, ignore_label):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
-    return compute_metrics(logits, batch["label"], num_classes)
+    return compute_metrics(logits, batch["label"], num_classes, ignore_label)
 
 
 def prepare_tf_data(xs):
@@ -186,7 +204,9 @@ def prepare_tf_data(xs):
     return jax.tree_map(_prepare, xs)
 
 
-def create_input_iter(dataset_builder, batch_size, image_size, dtype, train, cache):
+def create_input_iter(
+    dataset_builder, batch_size, image_size, dtype, train, cache, ignore_label
+):
     ds = input_pipeline.create_split(
         dataset_builder,
         batch_size,
@@ -194,6 +214,7 @@ def create_input_iter(dataset_builder, batch_size, image_size, dtype, train, cac
         dtype=dtype,
         train=train,
         cache=cache,
+        ignore_label=ignore_label,
     )
     it = map(prepare_tf_data, ds)
     it = jax_utils.prefetch_to_device(it, 2)
@@ -308,6 +329,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         input_dtype,
         train=True,
         cache=config.cache,
+        ignore_label=config.ignore_label,
     )
     eval_iter = create_input_iter(
         dataset_builder,
@@ -316,6 +338,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         input_dtype,
         train=False,
         cache=config.cache,
+        ignore_label=config.ignore_label,
     )
     num_classes = config.num_classes
 
@@ -355,12 +378,18 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
 
     p_train_step = jax.pmap(
         functools.partial(
-            train_step, learning_rate_fn=learning_rate_fn, num_classes=num_classes
+            train_step,
+            learning_rate_fn=learning_rate_fn,
+            num_classes=num_classes,
+            ignore_label=config.ignore_label,
         ),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
-        functools.partial(eval_step, num_classes=num_classes), axis_name="batch"
+        functools.partial(
+            eval_step, num_classes=num_classes, ignore_label=config.ignore_label
+        ),
+        axis_name="batch",
     )
 
     dropout_rngs = jax.random.split(dropout_rng, jax.local_device_count())
@@ -409,11 +438,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             eval_metrics = common_utils.get_metrics(eval_metrics)
             summary = jax.tree_map(lambda x: x.mean(), eval_metrics)
             logging.info(
-                "eval epoch: %d, loss: %.4f, accuracy: %.2f, miou: %.4f",
+                "eval epoch: %d, loss: %.4f, miou: %.4f, class accuracy: %.4f, pixel accuracy: %.4f",
                 epoch,
                 summary["loss"],
-                summary["accuracy"] * 100,
                 summary["miou"],
+                summary["mean_class_accuracy"],
+                summary["pixel_accuracy"],
             )
             writer.write_scalars(
                 step + 1, {f"eval_{key}": val for key, val in summary.items()}

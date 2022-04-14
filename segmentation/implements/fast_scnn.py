@@ -122,7 +122,7 @@ class FeatureFusion(nn.Module):
         )
         y = self.depthwise_separable_conv(
             128,
-            dilation=(x_height // y_height, x_width // y_width),
+#           dilation=(x_height // y_height, x_width // y_width),
         )(y)
         y = self.norm()(y)
         y = self.act(y)
@@ -176,7 +176,7 @@ class FastSCNN(nn.Module):
         x = depthwise_separable_conv(64, strides=(2, 2))(x)
 
         # Global Feature Extractor
-        y = x
+        high_res = x
 
         x = bottlenck(filters=64, strides=(2, 2), expansion=6, block_id=0)(x)
         x = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=1)(x)
@@ -190,10 +190,10 @@ class FastSCNN(nn.Module):
         x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=7)(x)
         x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=8)(x)
 
-        x = pyramid_pooling()(x)
+        low_res = pyramid_pooling()(x)
 
         # Feature Fusion
-        x = feature_fusion()(y, x)  # high res, low res
+        x = feature_fusion()(high_res, low_res)  # high res, low res
 
         # Classifier
         x = depthwise_separable_conv(128, strides=(1, 1))(x)

@@ -17,6 +17,7 @@ python main.py --workdir=./train_dir --config=configs/default.py
 
 | Model                       | Args                               |
 | :-------------------------- | :--------------------------------- |
+|MobileNetV1 alpha=1.0 depth depth multiplier=1.0 | `--config.model=MobileNetV1_10` |
 | MobileNetV2 alpha=1.0       | `--config.model=MobileNetV2_10`    |
 | MobileNetV3 Large alpha=1.0 | `--config.model=MobileNetV3_Large` |
 | MobileNetV3 Small alpha=1.0 | `--config.model=MobileNetV3_Small` |
