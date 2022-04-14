@@ -92,12 +92,12 @@ class PyramidPooling(nn.Module):
             x = self.norm()(x)
             x = self.act(x)
             x = jax.image.resize(
-                x, shape=(batch, height, width, channels), method="bilinear"
+                x, shape=(batch, height, width, filters), method="bilinear"
             )
             concat_list.append(x)
 
-        x = jnp.concatenate(concat_list)
-        x = self.conv(filters, (1, 1))(x)
+        x = jnp.concatenate(concat_list, axis=-1)
+        x = self.conv(channels, (1, 1))(x)
         x = self.norm()(x)
         return self.act(x)
 
@@ -105,7 +105,6 @@ class PyramidPooling(nn.Module):
 class FeatureFusion(nn.Module):
     """Feature Fusion Module."""
 
-    depthwise_separable_conv: ModuleDef
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
     act: Callable = nn.relu
@@ -120,9 +119,15 @@ class FeatureFusion(nn.Module):
         y = jax.image.resize(
             y, shape=(batch, x_height, x_width, channels), method="bilinear"
         )
-        y = self.depthwise_separable_conv(
-            128,
-#           dilation=(x_height // y_height, x_width // y_width),
+        # Depthwise
+        dw_filters = y.shape[-1]
+        y = self.conv(
+            features=dw_filters,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding="SAME",
+            kernel_dilation=(x_height // y_height, x_width // y_width),
+            feature_group_count=dw_filters,
         )(y)
         y = self.norm()(y)
         y = self.act(y)
@@ -160,7 +165,6 @@ class FastSCNN(nn.Module):
         pyramid_pooling = partial(PyramidPooling, conv=conv, norm=norm, act=self.act)
         feature_fusion = partial(
             FeatureFusion,
-            depthwise_separable_conv=depthwise_separable_conv,
             conv=conv,
             norm=norm,
             act=self.act,
