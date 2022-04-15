@@ -82,22 +82,21 @@ class PyramidPooling(nn.Module):
         batch, height, width, channels = x.shape
         filters = channels // len(self.bin_sizes)
         concat_list = [x]
-        inputs = x
 
         for bin_size in self.bin_sizes:
-            x = nn.avg_pool(
-                inputs, window_shape=(bin_size, bin_size), strides=(bin_size, bin_size)
+            y = nn.avg_pool(
+                x, window_shape=(bin_size, bin_size), strides=(bin_size, bin_size)
             )
-            x = self.conv(filters, kernel_size=(1, 1))(x)
-            x = self.norm()(x)
-            x = self.act(x)
-            x = jax.image.resize(
-                x, shape=(batch, height, width, filters), method="bilinear"
+            y = self.conv(filters, kernel_size=(1, 1))(y)
+            y = self.norm()(y)
+            y = self.act(y)
+            y = jax.image.resize(
+                y, shape=(batch, height, width, filters), method="bilinear"
             )
-            concat_list.append(x)
+            concat_list.append(y)
 
         x = jnp.concatenate(concat_list, axis=-1)
-        x = self.conv(channels, (1, 1))(x)
+        x = self.conv(channels, kernel_size=(1, 1))(x)
         x = self.norm()(x)
         return self.act(x)
 
@@ -111,11 +110,11 @@ class FeatureFusion(nn.Module):
 
     @nn.compact
     def __call__(self, x, y):
-        x = self.conv(128, (1, 1))(x)
+        x = self.conv(128, kernel_size=(1, 1))(x)
         x = self.norm()(x)
 
-        batch, x_height, x_width, channels = x.shape
-        _, y_height, y_width, _ = y.shape
+        _, x_height, x_width, _ = x.shape
+        batch, _, _, channels = y.shape
         y = jax.image.resize(
             y, shape=(batch, x_height, x_width, channels), method="bilinear"
         )
@@ -126,7 +125,6 @@ class FeatureFusion(nn.Module):
             kernel_size=(3, 3),
             strides=(1, 1),
             padding="SAME",
-            kernel_dilation=(x_height // y_height, x_width // y_width),
             feature_group_count=dw_filters,
         )(y)
         y = self.norm()(y)
@@ -208,5 +206,4 @@ class FastSCNN(nn.Module):
         x = jax.image.resize(
             x, shape=(batch, height, width, self.num_classes), method="bilinear"
         )
-
-        return x
+        return jnp.asarray(x, self.dtype)

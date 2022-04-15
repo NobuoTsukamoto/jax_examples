@@ -34,34 +34,63 @@ LABEL_ID = np.asarray([255, 255, 255, 255, 255, 255,
 
 
 class Augment(tf.keras.layers.Layer):
-    def __init__(self, height=512, width=1024, seed=42, dtype=tf.float32):
+    def __init__(
+        self,
+        image_size=(1024, 2048),
+        crop_size=(512, 1024),
+        ignore_label=255,
+        seed=42,
+        dtype=tf.float32,
+    ):
         super().__init__()
-        self.image_size = (1024, 2048)
+        self.image_size = image_size
+        self.crop_size = crop_size
+        self.ignore_label = ignore_label
         self.input_dtype = dtype
         self.random_resize_factor = Random(seed)
         self.inputs_random_flip = tf.keras.layers.RandomFlip(
             mode="horizontal", seed=seed
         )
         self.inputs_random_crop = tf.keras.layers.RandomCrop(
-            height=height, width=width, seed=seed
+            height=crop_size[0], width=crop_size[1], seed=seed
         )
         self.labels_random_flip = tf.keras.layers.RandomFlip(
             mode="horizontal", seed=seed
         )
         self.labels_random_crop = tf.keras.layers.RandomCrop(
-            height=height, width=width, seed=seed
+            height=crop_size[0], width=crop_size[1], seed=seed
         )
         self.inputs_random_contrast = tf.keras.layers.RandomContrast(
-            factor=0.4, seed=seed
+            factor=0.6, seed=seed
         )
 
     def call(self, inputs, labels):
-        resize_factor = self.random_resize_factor.uniform(0.5, 1.5)
+        resize_factor = self.random_resize_factor.uniform(0.5, 2.0)
         new_height = int(self.image_size[0] * resize_factor)
         new_width = int(self.image_size[1] * resize_factor)
 
+        print(new_height, new_width)
+
         inputs = tf.image.resize(
             inputs, (new_height, new_width), method=tf.image.ResizeMethod.BILINEAR
+        )
+        pad_along_height = (
+            self.crop_size[0] - new_height if new_height < self.crop_size[0] else 0
+        )
+        pad_along_width = (
+            self.crop_size[1] - new_width if new_width < self.crop_size[1] else 0
+        )
+
+        pad_top = pad_along_height // 2
+        pad_bottom = pad_along_height - pad_top
+        pad_left = pad_along_width // 2
+        pad_right = pad_along_width - pad_left
+
+        inputs = tf.pad(
+            inputs,
+            [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
+            mode="CONSTANT",
+            constant_values=0.0,
         )
         inputs = self.inputs_random_crop(inputs)
         inputs = self.inputs_random_flip(inputs)
@@ -71,6 +100,12 @@ class Augment(tf.keras.layers.Layer):
             labels,
             (new_height, new_width),
             method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+        )
+        labels = tf.pad(
+            labels,
+            [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
+            mode="CONSTANT",
+            constant_values=self.ignore_label,
         )
         labels = self.labels_random_crop(labels)
         labels = self.labels_random_flip(labels)
@@ -86,8 +121,10 @@ def normalize_image(input_image, input_mask, dtype=tf.float32):
     input_image /= tf.constant(STDDEV_RGB, shape=[1, 1, 3], dtype=input_image.dtype)
 
     input_mask = tf.cast(input_mask, dtype=tf.int32)
-    # input_mask = tf.where(input_mask >= 34, 34, input_mask)
-    input_mask = tf.cast(tf.gather(LABEL_ID, tf.cast(input_mask, dtype=tf.int32)), dtype=tf.uint8)
+    input_mask = tf.where(input_mask >= 34, 34, input_mask)
+    input_mask = tf.cast(
+        tf.gather(LABEL_ID, tf.cast(input_mask, dtype=tf.int32)), dtype=tf.uint8
+    )
 
     return input_image, input_mask
 
@@ -164,7 +201,7 @@ def create_split(
         ds = ds.shuffle(32 * batch_size, seed=42)
         ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
-        ds = ds.map(Augment())
+        ds = ds.map(Augment(crop_size=image_size, ignore_label=ignore_label, seed=42))
 
     if not train:
         ds = ds.batch(batch_size, drop_remainder=True)
