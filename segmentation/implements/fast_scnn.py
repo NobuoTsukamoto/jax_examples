@@ -9,13 +9,13 @@
 
 from dataclasses import field
 from functools import partial
-from typing import Any, Callable, Sequence, Tuple
+from typing import Any, Callable, Sequence
 
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
 
-from .common_layer import InvertedResBlock
+from .common_layer import InvertedResBlock, DepthwiseSeparable
 
 ModuleDef = Any
 
@@ -26,47 +26,6 @@ ModuleDef = Any
 
         https://github.com/Tramac/Fast-SCNN-pytorch
 """
-
-
-class DepthwiseSeparable(nn.Module):
-    """DepthwiseSeparableConv"""
-
-    conv: ModuleDef
-    norm: ModuleDef
-    act: Callable
-    out_features: int
-    dw_kernel_size: Tuple[int, int] = (3, 3)
-    pw_kernel_size: Tuple[int, int] = (1, 1)
-    strides: Tuple[int, int] = (1, 1)
-    dilation: Tuple[int, int] = (1, 1)
-    pad_type: str = "SAME"
-
-    @nn.compact
-    def __call__(self, x):
-        in_features = x.shape[-1]
-
-        x = self.conv(
-            in_features,
-            self.dw_kernel_size,
-            strides=self.strides,
-            kernel_dilation=self.dilation,
-            feature_group_count=in_features,
-            padding=self.pad_type,
-            name="dw_conv",
-        )(x)
-        x = self.norm(name="dw_bn")(x)
-        x = self.act(x)
-
-        x = self.conv(
-            self.out_features,
-            self.pw_kernel_size,
-            padding=self.pad_type,
-            name="pw_conv",
-        )(x)
-        x = self.norm(name="pw_bn")(x)
-        x = self.act(x)
-
-        return x
 
 
 class PyramidPooling(nn.Module):
@@ -118,7 +77,7 @@ class FeatureFusion(nn.Module):
         y = jax.image.resize(
             y, shape=(batch, x_height, x_width, channels), method="bilinear"
         )
-        # Depthwise
+        # DepthwiseConv
         dw_filters = y.shape[-1]
         y = self.conv(
             features=dw_filters,
@@ -133,8 +92,7 @@ class FeatureFusion(nn.Module):
         y = self.norm()(y)
 
         x = x + y
-        x = self.act(x)
-        return x
+        return self.act(x)
 
 
 class FastSCNN(nn.Module):
@@ -175,12 +133,10 @@ class FastSCNN(nn.Module):
         x = norm()(x)
         x = self.act(x)
         x = depthwise_separable_conv(48, strides=(2, 2))(x)
-        x = depthwise_separable_conv(64, strides=(2, 2))(x)
+        high_res = depthwise_separable_conv(64, strides=(2, 2))(x)
 
         # Global Feature Extractor
-        high_res = x
-
-        x = bottlenck(filters=64, strides=(2, 2), expansion=6, block_id=0)(x)
+        x = bottlenck(filters=64, strides=(2, 2), expansion=6, block_id=0)(high_res)
         x = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=1)(x)
         x = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=2)(x)
 
@@ -192,6 +148,7 @@ class FastSCNN(nn.Module):
         x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=7)(x)
         x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=8)(x)
 
+        # Pyramid Pooing
         low_res = pyramid_pooling()(x)
 
         # Feature Fusion

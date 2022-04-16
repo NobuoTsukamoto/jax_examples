@@ -84,7 +84,7 @@ class InvertedResBlock(nn.Module):
         )(x)
         x = self.norm(name=prefix + "project_bn")(x)
 
-        if in_channels == pointwise_filters and self.strides == 1:
+        if in_channels == pointwise_filters and self.strides == (1, 1):
             x = x + inputs
 
         return x

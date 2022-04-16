@@ -24,7 +24,7 @@ def get_config():
     config.num_classes = 19
 
     # Training param
-    config.learning_rate = 0.1
+    config.learning_rate = 0.01
     config.warmup_epochs = 10.0
     config.momentum = 0.9
     config.batch_size = 8
@@ -34,6 +34,14 @@ def get_config():
 
     config.cache = False
     config.half_precision = False
+
+    # fmt: off
+    config.class_weights = [
+        0.8373, 0.918, 0.866, 1.0345, 1.0166, 0.9969, 0.9754,
+        1.0489, 0.8786, 1.0023, 0.9539, 0.9843, 1.1116, 0.9037,
+        1.0865, 1.0955, 1.0865, 1.1529, 1.0507,
+    ]
+    # fmt: on
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.

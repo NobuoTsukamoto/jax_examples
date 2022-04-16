@@ -69,8 +69,6 @@ class Augment(tf.keras.layers.Layer):
         new_height = int(self.image_size[0] * resize_factor)
         new_width = int(self.image_size[1] * resize_factor)
 
-        print(new_height, new_width)
-
         inputs = tf.image.resize(
             inputs, (new_height, new_width), method=tf.image.ResizeMethod.BILINEAR
         )

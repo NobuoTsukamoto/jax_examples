@@ -60,7 +60,7 @@ def initialized(key, image_size, model):
     return variables["params"], variables["batch_stats"]
 
 
-def cross_entropy_loss(logits, labels, num_classes, ignore_label):
+def cross_entropy_loss(logits, labels, num_classes, ignore_label, class_weights=None):
     # https://github.com/tensorflow/models/blob/c44482ab303f6a13b33048ca6058877c06a6a2d1/official/vision/losses/segmentation_losses.py#L36
 
     valid_mask = jnp.not_equal(labels, ignore_label)
@@ -72,7 +72,9 @@ def cross_entropy_loss(logits, labels, num_classes, ignore_label):
     )
     xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
 
-    class_weights = jnp.ones(num_classes, dtype=jnp.float32)
+    if class_weights is None:
+        class_weights = jnp.ones(num_classes, dtype=jnp.float32)
+
     weight_mask = jnp.einsum(
         "...y,y->...",
         common_utils.onehot(labels, num_classes=num_classes),
@@ -81,7 +83,6 @@ def cross_entropy_loss(logits, labels, num_classes, ignore_label):
     valid_mask *= weight_mask
     xentropy *= jnp.squeeze(valid_mask, axis=-1).astype(jnp.float32)
     return jnp.sum(xentropy) / normalizer
-    # return jnp.mean(xentropy)
 
 
 def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
@@ -93,9 +94,8 @@ def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
     )
 
 
-def compute_metrics(logits, labels, num_classes, ignore_label):
-    loss = cross_entropy_loss(logits, labels, num_classes, ignore_label)
-    # accuracy = jnp.mean(jnp.argmax(logits, axis=-1, keepdims=True) == labels)
+def compute_metrics(logits, labels, num_classes, ignore_label, class_weights=None):
+    loss = cross_entropy_loss(logits, labels, num_classes, ignore_label, class_weights)
     metrics = semantic_segmentation_metrics(logits, labels, num_classes, ignore_label)
     metrics["loss"] = loss
     metrics = lax.pmean(metrics, axis_name="batch")
@@ -123,7 +123,13 @@ def create_learning_rate_fn(
 
 
 def train_step(
-    state, batch, learning_rate_fn, num_classes, ignore_label, dropout_rng=None
+    state,
+    batch,
+    learning_rate_fn,
+    num_classes,
+    ignore_label,
+    class_weights=None,
+    dropout_rng=None,
 ):
     """Perform a single training step."""
 
@@ -139,7 +145,7 @@ def train_step(
         )
         loss = cross_entropy_loss(logits, batch["label"], num_classes, ignore_label)
         weight_penalty_params = jax.tree_leaves(params)
-        weight_decay = 0.0001
+        weight_decay = 0.00004
         weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
         weight_penalty = weight_decay * 0.5 * weight_l2
         loss = loss + weight_penalty
@@ -159,7 +165,9 @@ def train_step(
         # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
         grads = lax.pmean(grads, axis_name="batch")
     new_model_state, logits = aux[1]
-    metrics = compute_metrics(logits, batch["label"], num_classes, ignore_label)
+    metrics = compute_metrics(
+        logits, batch["label"], num_classes, ignore_label, class_weights
+    )
     metrics["learning_rate"] = lr
 
     new_state = state.apply_gradients(
@@ -183,10 +191,12 @@ def train_step(
     return new_state, metrics, new_dropout_rng
 
 
-def eval_step(state, batch, num_classes, ignore_label):
+def eval_step(state, batch, num_classes, ignore_label, class_weights=None):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
-    return compute_metrics(logits, batch["label"], num_classes, ignore_label)
+    return compute_metrics(
+        logits, batch["label"], num_classes, ignore_label, class_weights
+    )
 
 
 def prepare_tf_data(xs):
@@ -382,12 +392,16 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             learning_rate_fn=learning_rate_fn,
             num_classes=num_classes,
             ignore_label=config.ignore_label,
+            class_weights=config.class_weights,
         ),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
         functools.partial(
-            eval_step, num_classes=num_classes, ignore_label=config.ignore_label
+            eval_step,
+            num_classes=num_classes,
+            ignore_label=config.ignore_label,
+            class_weights=config.class_weights,
         ),
         axis_name="batch",
     )

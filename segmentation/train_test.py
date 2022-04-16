@@ -37,9 +37,9 @@ class TrainTest(parameterized.TestCase):
         }
         params, batch_stats = train.initialized(rngs, (2048, 1024), model)
         variables = {"params": params, "batch_stats": batch_stats}
-        x = random.normal(random.PRNGKey(1), (8, 2048, 1024, 3))
+        x = random.normal(random.PRNGKey(1), (4, 2048, 1024, 3))
         y = model.apply(variables, x, train=False)
-        self.assertEqual(y.shape, (8, 2048, 1024, 19))
+        self.assertEqual(y.shape, (4, 2048, 1024, 19))
 
     @parameterized.product(model=("Fast_SCNN",))
     def test_train_and_evaluate(self, model):

@@ -35,14 +35,14 @@ class FastSCNNTest(parameterized.TestCase):
 
         print(parameter_overview.get_parameter_overview(variables))
 
-    def test_fast_scnn_1024_512_model(self):
+    def test_fast_scnn_512_1024_model(self):
         """Tests Fast-SCNN model definition and output (variables)."""
         rngs = {
             "params": jax.random.PRNGKey(0),
             "dropout": jax.random.PRNGKey(1),
         }
         model_def = FastSCNN(num_classes=19, dtype=jnp.float32)
-        variables = model_def.init(rngs, jnp.ones((1, 1024, 512, 3), jnp.float32))
+        variables = model_def.init(rngs, jnp.ones((1, 512, 1024, 3), jnp.float32))
 
         self.assertLen(variables, 2)
         # Fast-SCNN model will create parameters for the following layers:
