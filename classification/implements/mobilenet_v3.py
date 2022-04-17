@@ -28,32 +28,8 @@ ModuleDef = Any
 """
 
 
-class SeBlock(nn.Module):
-    filters: int
-    se_ratio: int
-    conv: ModuleDef
-
-    @nn.compact
-    def __call__(self, x):
-
-        inputs = x
-        filters = _make_divisible(self.filters * self.se_ratio)
-        in_filters = x.shape[-1]
-
-        x = jnp.mean(x, axis=(1, 2), keepdims=True)
-        x = x.reshape(-1, 1, 1, in_filters)
-
-        x = self.conv(filters, kernel_size=(1, 1), padding="same")(x)
-        x = nn.relu(x)
-
-        x = self.conv(self.filters, kernel_size=(1, 1), padding="same")(x)
-        x = jnn.hard_sigmoid(x)
-
-        return inputs * x
-
-
 class InvertedResBlock(nn.Module):
-    """Inverted ResNet block."""
+    """Inverted ResNet block for MobileNet V3."""
 
     expansion: float
     filters: int
@@ -119,7 +95,7 @@ class InvertedResBlock(nn.Module):
         )(x)
         x = self.norm(name=prefix + "project_bn")(x)
 
-        if in_channels == self.filters and self.strides == 1:
+        if in_channels == self.filters and self.strides == (1, 1):
             x = x + inputs
 
         return x
@@ -187,11 +163,8 @@ class MobileNetV3(nn.Module):
 
         x = conv(self.num_classes, kernel_size=(1, 1), name="conv_3")(x)
         x = x.reshape((x.shape[0], -1))  # flatten
-        # x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
 
-        x = jnp.asarray(x, self.dtype)
-
-        return x
+        return jnp.asarray(x, self.dtype)
 
 
 # fmt: off

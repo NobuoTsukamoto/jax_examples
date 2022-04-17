@@ -60,28 +60,38 @@ def initialized(key, image_size, model):
     return variables["params"], variables["batch_stats"]
 
 
-def cross_entropy_loss(logits, labels, num_classes, ignore_label, class_weights=None):
+def cross_entropy_loss(
+    logits, labels, num_classes, ignore_label, class_weights=None, label_smoothing=0.0
+):
     # https://github.com/tensorflow/models/blob/c44482ab303f6a13b33048ca6058877c06a6a2d1/official/vision/losses/segmentation_losses.py#L36
 
     valid_mask = jnp.not_equal(labels, ignore_label)
+    normalizer = jnp.sum(valid_mask.astype(jnp.float32)) + EPSILON
     labels = jnp.where(valid_mask, labels, jnp.zeros_like(labels))
-    normalizer = jnp.sum(valid_mask.astype(jnp.float32), dtype=jnp.float32) + EPSILON
+
+    # labels = jnp.squeeze(labels, axis=-1)
+    valid_mask = jnp.squeeze(valid_mask, axis=-1)
 
     one_hot_labels = jnp.squeeze(
         common_utils.onehot(labels, num_classes=num_classes), axis=3
     )
-    xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
+    smoothing_one_hot_labels = (
+        one_hot_labels * (1 - label_smoothing) + label_smoothing / num_classes
+    )
+    xentropy = optax.softmax_cross_entropy(
+        logits=logits, labels=smoothing_one_hot_labels
+    )
 
     if class_weights is None:
         class_weights = jnp.ones(num_classes, dtype=jnp.float32)
 
     weight_mask = jnp.einsum(
         "...y,y->...",
-        common_utils.onehot(labels, num_classes=num_classes),
+        one_hot_labels,
         class_weights,
     )
     valid_mask *= weight_mask
-    xentropy *= jnp.squeeze(valid_mask, axis=-1).astype(jnp.float32)
+    xentropy *= valid_mask.astype(jnp.float32)
     return jnp.sum(xentropy) / normalizer
 
 

@@ -42,11 +42,10 @@ class InvertedResBlock(nn.Module):
     dtype: Any = jnp.float32
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, inputs):
         prefix = "block_{}_".format(self.block_id)
 
-        inputs = x
-        in_channels = x.shape[-1]
+        in_channels = inputs.shape[-1]
         pointwise_conv_filters = int(self.filters * self.alpha)
         pointwise_filters = _make_divisible(pointwise_conv_filters, 8)
 
@@ -57,7 +56,7 @@ class InvertedResBlock(nn.Module):
             strides=(1, 1),
             padding="SAME",
             name=prefix + "expand",
-        )(x)
+        )(inputs)
         x = self.norm(name=prefix + "expand_bn")(x)
         x = self.act(x)
 
@@ -131,3 +130,28 @@ class DepthwiseSeparable(nn.Module):
         x = self.act(x)
 
         return x
+
+
+class SeBlock(nn.Module):
+    filters: int
+    se_ratio: int
+    conv: ModuleDef
+
+    @nn.compact
+    def __call__(self, x):
+
+        inputs = x
+        filters = _make_divisible(self.filters * self.se_ratio)
+        in_filters = x.shape[-1]
+
+        x = jnp.mean(x, axis=(1, 2), keepdims=True)
+        x = x.reshape(-1, 1, 1, in_filters)
+
+        x = self.conv(filters, kernel_size=(1, 1), padding="same")(x)
+        x = nn.relu(x)
+
+        x = self.conv(self.filters, kernel_size=(1, 1), padding="same")(x)
+        x = jnn.hard_sigmoid(x)
+
+        return inputs * x
+

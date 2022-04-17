@@ -68,30 +68,30 @@ class FeatureFusion(nn.Module):
     act: Callable = nn.relu
 
     @nn.compact
-    def __call__(self, x, y):
-        x = self.conv(128, kernel_size=(1, 1))(x)
-        x = self.norm()(x)
+    def __call__(self, high_res, low_res):
+        high_res = self.conv(128, kernel_size=(1, 1))(high_res)
+        high_res = self.norm()(high_res)
 
-        _, x_height, x_width, _ = x.shape
-        batch, _, _, channels = y.shape
-        y = jax.image.resize(
-            y, shape=(batch, x_height, x_width, channels), method="bilinear"
+        _, x_height, x_width, _ = high_res.shape
+        batch, _, _, channels = low_res.shape
+        low_res = jax.image.resize(
+            low_res, shape=(batch, x_height, x_width, channels), method="bilinear"
         )
         # DepthwiseConv
-        dw_filters = y.shape[-1]
-        y = self.conv(
+        dw_filters = low_res.shape[-1]
+        low_res = self.conv(
             features=dw_filters,
             kernel_size=(3, 3),
             strides=(1, 1),
             padding="SAME",
             feature_group_count=dw_filters,
-        )(y)
-        y = self.norm()(y)
-        y = self.act(y)
-        y = self.conv(128, kernel_size=(1, 1))(y)
-        y = self.norm()(y)
+        )(low_res)
+        low_res = self.norm()(low_res)
+        low_res = self.act(low_res)
+        low_res = self.conv(128, kernel_size=(1, 1))(low_res)
+        low_res = self.norm()(low_res)
 
-        x = x + y
+        x = high_res + low_res
         return self.act(x)
 
 

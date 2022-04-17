@@ -65,7 +65,7 @@ class Augment(tf.keras.layers.Layer):
         )
 
     def call(self, inputs, labels):
-        resize_factor = self.random_resize_factor.uniform(0.5, 2.0)
+        resize_factor = self.random_resize_factor.uniform(0.5, 1.5)
         new_height = int(self.image_size[0] * resize_factor)
         new_width = int(self.image_size[1] * resize_factor)
 
@@ -73,10 +73,10 @@ class Augment(tf.keras.layers.Layer):
             inputs, (new_height, new_width), method=tf.image.ResizeMethod.BILINEAR
         )
         pad_along_height = (
-            self.crop_size[0] - new_height if new_height < self.crop_size[0] else 0
+            self.image_size[0] - new_height if new_height < self.image_size[0] else 0
         )
         pad_along_width = (
-            self.crop_size[1] - new_width if new_width < self.crop_size[1] else 0
+            self.image_size[1] - new_width if new_width < self.image_size[1] else 0
         )
 
         pad_top = pad_along_height // 2
