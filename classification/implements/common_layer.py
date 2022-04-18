@@ -7,17 +7,20 @@
     See the LICENSE file in the project root for more information.
 """
 
+from functools import partial
 from typing import Any, Callable, Tuple
 
 import jax.numpy as jnp
+import jax.nn as jnn
 from flax import linen as nn
 
 ModuleDef = Any
 
 
 def _make_divisible(v, divisor=8, min_value=None):
-    """Rifference:
-    https://github.com/keras-team/keras/blob/v2.8.0/keras/applications/mobilenet_v2.py#L505
+    """
+    Reference:
+        https://github.com/keras-team/keras/blob/v2.8.0/keras/applications/mobilenet_v2.py#L505
     """
     if min_value is None:
         min_value = divisor
@@ -89,6 +92,79 @@ class InvertedResBlock(nn.Module):
         return x
 
 
+class InvertedResBlockMobileNetV3(nn.Module):
+    """Inverted ResNet block for MobileNet V3."""
+
+    expansion: float
+    filters: int
+    kernel_size: Tuple[int, int]
+    strides: Tuple[int, int]
+    se_ratio: float
+    block_id: int
+    conv: ModuleDef
+    norm: ModuleDef
+    act: Callable = None
+    dtype: Any = jnp.float32
+
+    @nn.compact
+    def __call__(self, x):
+
+        inputs = x
+        in_filters = x.shape[-1]
+
+        se_bolock = partial(
+            SeBlock,
+            filters=_make_divisible(in_filters * self.expansion),
+            se_ratio=self.se_ratio,
+            conv=self.conv,
+        )
+
+        prefix = "block_{}_".format(self.block_id)
+        in_channels = x.shape[-1]
+
+        # Expand
+        x = self.conv(
+            features=int(in_channels * self.expansion),
+            kernel_size=(1, 1),
+            strides=(1, 1),
+            padding="SAME",
+            name=prefix + "expand",
+        )(x)
+        x = self.norm(name=prefix + "expand_bn")(x)
+        x = self.act(x)
+
+        # Depthwise
+        dw_filters = x.shape[-1]
+        x = self.conv(
+            features=dw_filters,
+            kernel_size=(3, 3),
+            strides=self.strides,
+            padding="SAME",
+            feature_group_count=dw_filters,
+            name=prefix + "depthwise",
+        )(x)
+        x = self.norm(name=prefix + "depthwise_bn")(x)
+        x = self.act(x)
+
+        if self.se_ratio:
+            x = se_bolock()(x)
+
+        # Project
+        x = self.conv(
+            features=self.filters,
+            kernel_size=(1, 1),
+            strides=(1, 1),
+            padding="SAME",
+            name=prefix + "project",
+        )(x)
+        x = self.norm(name=prefix + "project_bn")(x)
+
+        if in_channels == self.filters and self.strides == (1, 1):
+            x = x + inputs
+
+        return x
+
+
 class DepthwiseSeparable(nn.Module):
     """DepthwiseSeparableConv"""
 
@@ -154,4 +230,3 @@ class SeBlock(nn.Module):
         x = jnn.hard_sigmoid(x)
 
         return inputs * x
-

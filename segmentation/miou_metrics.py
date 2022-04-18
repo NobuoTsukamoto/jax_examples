@@ -56,9 +56,9 @@ def eval_semantic_segmentation(pred_labels, gt_labels, num_classes, ignore_label
     class_accuracy = jnp.diag(confusion) / jnp.sum(confusion, axis=1)
 
     return {
-        #       "iou": iou,
+        "iou": iou,
         "miou": jnp.nanmean(iou),
         "pixel_accuracy": pixel_accuracy,
-        #       "class_accuracy": class_accuracy,
+        "class_accuracy": class_accuracy,
         "mean_class_accuracy": jnp.nanmean(class_accuracy),
     }

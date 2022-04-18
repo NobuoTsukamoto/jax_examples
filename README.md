@@ -6,6 +6,16 @@ Jax, Flax, examples (ImageClassification, SemanticSegmentation, and more...)
 I started to learn JAX, Flax, Optax, etc ...  
 I will be adding mainly computer vision tasks. I will start with code for model learning, inference, and export to other frameworks (such as TensorFlow).
 
+## TODO
+
+- [ ] Implementation of inference code.
+- [ ] Export TensorFlow Saved Mdoel or ONNX model, etc...
+- [ ] Add more models...
+  - [ ] Segmentation model (LR-RASPP).
+  - [ ] Object detection model.
+- [ ] Training with Colab TPU.
+
+
 # Reference
 - [JAX: Autograd and XLA](https://github.com/google/jax)
 - [Flax: A neural network library and ecosystem for JAX designed for flexibility](https://github.com/google/flax)
@@ -31,4 +41,8 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 |Fast-SCNN: Fast Semantic Segmentation Network | https://arxiv.org/abs/1902.04502 |
 
 # Installation
+
 W.I.P
+```
+$ pip install jax flax ml_collections clu
+```

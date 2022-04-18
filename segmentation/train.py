@@ -11,7 +11,6 @@ import functools
 import time
 from typing import Any, Dict
 
-import flax
 import jax
 import jax.numpy as jnp
 import ml_collections
@@ -24,17 +23,13 @@ from flax import jax_utils
 from flax.optim import dynamic_scale as dynamic_scale_lib
 from flax.training import checkpoints, common_utils, train_state
 from jax import lax
-import numpy as np
+from jax.config import config
 
 import input_pipeline
 import models
-
 from miou_metrics import eval_semantic_segmentation
-from jax.config import config
 
 config.update("jax_disable_jit", True)
-
-EPSILON = 1e-5
 
 
 def create_model(*, model_cls, half_precision, num_classes, **kwargs):
@@ -61,12 +56,21 @@ def initialized(key, image_size, model):
 
 
 def cross_entropy_loss(
-    logits, labels, num_classes, ignore_label, class_weights=None, label_smoothing=0.0
+    logits,
+    labels,
+    num_classes,
+    ignore_label,
+    class_weights=None,
+    label_smoothing=0.0,
+    epsilon=1e-5,
 ):
-    # https://github.com/tensorflow/models/blob/c44482ab303f6a13b33048ca6058877c06a6a2d1/official/vision/losses/segmentation_losses.py#L36
+    """
+    Reference:
+        https://github.com/tensorflow/models/blob/c44482ab303f6a13b33048ca6058877c06a6a2d1/official/vision/losses/segmentation_losses.py#L36
+    """
 
     valid_mask = jnp.not_equal(labels, ignore_label)
-    normalizer = jnp.sum(valid_mask.astype(jnp.float32)) + EPSILON
+    normalizer = jnp.sum(valid_mask.astype(jnp.float32)) + epsilon
     labels = jnp.where(valid_mask, labels, jnp.zeros_like(labels))
 
     # labels = jnp.squeeze(labels, axis=-1)

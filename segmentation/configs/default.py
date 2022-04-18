@@ -17,7 +17,6 @@ def get_config():
     # As defined in the `models` module.
     config.model = "Fast_SCNN"
     config.image_size = (1024, 2048)
-    # config.image_size = (512, 1024)
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
@@ -41,6 +40,7 @@ def get_config():
         1.0489, 0.8786, 1.0023, 0.9539, 0.9843, 1.1116, 0.9037,
         1.0865, 1.0955, 1.0865, 1.1529, 1.0507,
     ]
+    # config.class_weights = None
     # fmt: on
 
     # If num_train_steps==-1 then the number of training steps is calculated from

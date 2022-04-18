@@ -10,7 +10,6 @@ import functools
 import time
 from typing import Any
 
-import flax
 import jax
 import jax.numpy as jnp
 import ml_collections

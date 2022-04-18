@@ -62,8 +62,8 @@ class TrainTest(parameterized.TestCase):
 
         with tfds.testing.mock_data(
             num_examples=1,
-            #policy=tfds.testing.MockPolicy.USE_FILES,
-            data_dir=data_dir
+            # policy=tfds.testing.MockPolicy.USE_FILES,
+            data_dir=data_dir,
         ):
             train.train_and_evaluate(workdir=workdir, config=config)
 

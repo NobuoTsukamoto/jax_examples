@@ -8,13 +8,13 @@
 """
 
 from functools import partial
-from typing import Any, Callable, Tuple, Dict
+from typing import Any, Callable, Dict
 
 import jax.numpy as jnp
 import jax.nn as jnn
 from flax import linen as nn
 
-from .common_layer import _make_divisible
+from .common_layer import _make_divisible, InvertedResBlockMobileNetV3
 
 ModuleDef = Any
 
@@ -26,79 +26,6 @@ ModuleDef = Any
 
         https://github.com/keras-team/keras-applications/blob/06fbeb0f16e1304f239b2296578d1c50b15a983a/keras_applications/mobilenet_v3.py
 """
-
-
-class InvertedResBlock(nn.Module):
-    """Inverted ResNet block for MobileNet V3."""
-
-    expansion: float
-    filters: int
-    kernel_size: Tuple[int, int]
-    strides: Tuple[int, int]
-    se_ratio: float
-    block_id: int
-    conv: ModuleDef
-    norm: ModuleDef
-    act: Callable = None
-    dtype: Any = jnp.float32
-
-    @nn.compact
-    def __call__(self, x):
-
-        inputs = x
-        in_filters = x.shape[-1]
-
-        se_bolock = partial(
-            SeBlock,
-            filters=_make_divisible(in_filters * self.expansion),
-            se_ratio=self.se_ratio,
-            conv=self.conv,
-        )
-
-        prefix = "block_{}_".format(self.block_id)
-        in_channels = x.shape[-1]
-
-        # Expand
-        x = self.conv(
-            features=int(in_channels * self.expansion),
-            kernel_size=(1, 1),
-            strides=(1, 1),
-            padding="SAME",
-            name=prefix + "expand",
-        )(x)
-        x = self.norm(name=prefix + "expand_bn")(x)
-        x = self.act(x)
-
-        # Depthwise
-        dw_filters = x.shape[-1]
-        x = self.conv(
-            features=dw_filters,
-            kernel_size=(3, 3),
-            strides=self.strides,
-            padding="SAME",
-            feature_group_count=dw_filters,
-            name=prefix + "depthwise",
-        )(x)
-        x = self.norm(name=prefix + "depthwise_bn")(x)
-        x = self.act(x)
-
-        if self.se_ratio:
-            x = se_bolock()(x)
-
-        # Project
-        x = self.conv(
-            features=self.filters,
-            kernel_size=(1, 1),
-            strides=(1, 1),
-            padding="SAME",
-            name=prefix + "project",
-        )(x)
-        x = self.norm(name=prefix + "project_bn")(x)
-
-        if in_channels == self.filters and self.strides == (1, 1):
-            x = x + inputs
-
-        return x
 
 
 class MobileNetV3(nn.Module):
@@ -115,7 +42,7 @@ class MobileNetV3(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        conv = partial(self.conv, use_bias=False, dtype=self.dtype)
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
@@ -123,7 +50,7 @@ class MobileNetV3(nn.Module):
             epsilon=1e-5,
             dtype=self.dtype,
         )
-        inverted_res_block = partial(InvertedResBlock, conv=conv, norm=norm)
+        inverted_res_block = partial(InvertedResBlockMobileNetV3, conv=conv, norm=norm)
 
         first_block_filters = _make_divisible(16 * self.alpha, 8)
 

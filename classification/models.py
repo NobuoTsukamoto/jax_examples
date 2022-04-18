@@ -13,7 +13,6 @@ from implements.mobilenet_v2 import MobileNetV2
 from implements.mobilenet_v3 import MobileNetV3, Large, Small
 
 # MobileNetV1 alpha=1.0 depth_multiplier=1.0
-
 MobileNetV1_10 = partial(MobileNetV1, alpha=1.0, depth_multiplier=1.0)
 
 

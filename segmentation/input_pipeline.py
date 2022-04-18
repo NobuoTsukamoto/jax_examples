@@ -10,7 +10,6 @@ from random import Random
 import numpy as np
 import jax
 import tensorflow as tf
-import tensorflow_datasets as tfds
 
 """ Input Pipline
 
@@ -65,7 +64,7 @@ class Augment(tf.keras.layers.Layer):
         )
 
     def call(self, inputs, labels):
-        resize_factor = self.random_resize_factor.uniform(0.5, 1.5)
+        resize_factor = self.random_resize_factor.uniform(0.75, 1.5)
         new_height = int(self.image_size[0] * resize_factor)
         new_width = int(self.image_size[1] * resize_factor)
 

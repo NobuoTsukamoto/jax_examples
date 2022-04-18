@@ -54,7 +54,7 @@ class FastSCNNTest(parameterized.TestCase):
         #   DepthwiseSeparableConv = 2
         #   Conv = 1
         self.assertLen(variables["params"], 18)
-        
+
         print(parameter_overview.get_parameter_overview(variables))
 
 
