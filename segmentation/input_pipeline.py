@@ -37,6 +37,9 @@ class Augment(tf.keras.layers.Layer):
         self,
         image_size=(1024, 2048),
         crop_size=(512, 1024),
+        base_image_size=(512, 1024),
+        min_resize_value=0.5,
+        max_resize_value=2.0,
         ignore_label=255,
         seed=42,
         dtype=tf.float32,
@@ -44,6 +47,9 @@ class Augment(tf.keras.layers.Layer):
         super().__init__()
         self.image_size = image_size
         self.crop_size = crop_size
+        self.base_image_size = base_image_size
+        self.min_resize_value = min_resize_value
+        self.max_resize_value = max_resize_value
         self.ignore_label = ignore_label
         self.input_dtype = dtype
         self.random_resize_factor = Random(seed)
@@ -64,9 +70,11 @@ class Augment(tf.keras.layers.Layer):
         )
 
     def call(self, inputs, labels):
-        resize_factor = self.random_resize_factor.uniform(0.75, 1.5)
-        new_height = int(self.image_size[0] * resize_factor)
-        new_width = int(self.image_size[1] * resize_factor)
+        resize_factor = self.random_resize_factor.uniform(
+            self.min_resize_value, self.max_resize_value
+        )
+        new_height = int(self.base_image_size[0] * resize_factor)
+        new_width = int(self.base_image_size[1] * resize_factor)
 
         inputs = tf.image.resize(
             inputs, (new_height, new_width), method=tf.image.ResizeMethod.BILINEAR
@@ -132,6 +140,9 @@ def create_split(
     train,
     dtype=tf.float32,
     image_size=IMAGE_SIZE,
+    min_resize_value=0.5,
+    max_resize_value=2.0,
+    base_image_size=IMAGE_SIZE,
     cache=False,
     ignore_label=255,
 ):
@@ -198,7 +209,16 @@ def create_split(
         ds = ds.shuffle(32 * batch_size, seed=42)
         ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
-        ds = ds.map(Augment(crop_size=image_size, ignore_label=ignore_label, seed=42))
+        ds = ds.map(
+            Augment(
+                crop_size=image_size,
+                base_image_size=base_image_size,
+                min_resize_value=min_resize_value,
+                max_resize_value=max_resize_value,
+                ignore_label=ignore_label,
+                seed=42,
+            )
+        )
 
     if not train:
         ds = ds.batch(batch_size, drop_remainder=True)

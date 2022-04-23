@@ -23,6 +23,7 @@ def get_config():
     config.num_classes = 19
 
     # Training param
+    config.optimizer = "sgd"
     config.learning_rate = 0.01
     config.warmup_epochs = 10.0
     config.momentum = 0.9

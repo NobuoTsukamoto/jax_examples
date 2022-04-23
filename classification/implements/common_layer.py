@@ -112,32 +112,27 @@ class InvertedResBlockMobileNetV3(nn.Module):
         inputs = x
         in_filters = x.shape[-1]
 
-        se_bolock = partial(
-            SeBlock,
-            filters=_make_divisible(in_filters * self.expansion),
-            se_ratio=self.se_ratio,
-            conv=self.conv,
-        )
+        se_bolock = partial(SeBlock, conv=self.conv,)
 
-        prefix = "block_{}_".format(self.block_id)
-        in_channels = x.shape[-1]
+        prefix = "block_{:02}_".format(self.block_id)
 
-        # Expand
-        x = self.conv(
-            features=int(in_channels * self.expansion),
-            kernel_size=(1, 1),
-            strides=(1, 1),
-            padding="SAME",
-            name=prefix + "expand",
-        )(x)
-        x = self.norm(name=prefix + "expand_bn")(x)
-        x = self.act(x)
+        if self.block_id != 1:
+            # Expand
+            x = self.conv(
+                features=int(in_filters * self.expansion),
+                kernel_size=(1, 1),
+                strides=(1, 1),
+                padding="SAME",
+                name=prefix + "expand",
+            )(x)
+            x = self.norm(name=prefix + "expand_bn")(x)
+            x = self.act(x)
 
         # Depthwise
         dw_filters = x.shape[-1]
         x = self.conv(
             features=dw_filters,
-            kernel_size=(3, 3),
+            kernel_size=self.kernel_size,
             strides=self.strides,
             padding="SAME",
             feature_group_count=dw_filters,
@@ -147,7 +142,10 @@ class InvertedResBlockMobileNetV3(nn.Module):
         x = self.act(x)
 
         if self.se_ratio:
-            x = se_bolock()(x)
+            x = se_bolock(
+                filters=_make_divisible(in_filters * self.expansion),
+                se_ratio=self.se_ratio,
+            )(x)
 
         # Project
         x = self.conv(
@@ -159,7 +157,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
         )(x)
         x = self.norm(name=prefix + "project_bn")(x)
 
-        if in_channels == self.filters and self.strides == (1, 1):
+        if in_filters == self.filters and self.strides == (1, 1):
             x = x + inputs
 
         return x
@@ -215,7 +213,6 @@ class SeBlock(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-
         inputs = x
         filters = _make_divisible(self.filters * self.se_ratio)
         in_filters = x.shape[-1]

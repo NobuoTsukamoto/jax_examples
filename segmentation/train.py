@@ -110,8 +110,15 @@ def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
 
 def compute_metrics(logits, labels, num_classes, ignore_label, class_weights=None):
     loss = cross_entropy_loss(logits, labels, num_classes, ignore_label, class_weights)
-    metrics = semantic_segmentation_metrics(logits, labels, num_classes, ignore_label)
-    metrics["loss"] = loss
+    segmentation_metrics = semantic_segmentation_metrics(
+        logits, labels, num_classes, ignore_label
+    )
+    metrics = {
+        "miou": segmentation_metrics["miou"],
+        "pixel_accuracy": segmentation_metrics["pixel_accuracy"],
+        "mean_class_accuracy": segmentation_metrics["mean_class_accuracy"],
+        "loss": loss,
+    }
     metrics = lax.pmean(metrics, axis_name="batch")
     return metrics
 
@@ -167,7 +174,8 @@ def train_step(
 
     step = state.step
     dynamic_scale = state.dynamic_scale
-    lr = learning_rate_fn(step)
+    if learning_rate_fn is not None:
+        lr = learning_rate_fn(step)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
@@ -182,7 +190,9 @@ def train_step(
     metrics = compute_metrics(
         logits, batch["label"], num_classes, ignore_label, class_weights
     )
-    metrics["learning_rate"] = lr
+
+    if learning_rate_fn is not None:
+        metrics["learning_rate"] = lr
 
     new_state = state.apply_gradients(
         grads=grads, batch_stats=new_model_state["batch_stats"]
@@ -229,12 +239,24 @@ def prepare_tf_data(xs):
 
 
 def create_input_iter(
-    dataset_builder, batch_size, image_size, dtype, train, cache, ignore_label
+    dataset_builder,
+    batch_size,
+    image_size,
+    min_resize_value,
+    max_resize_value,
+    base_image_size,
+    dtype,
+    train,
+    cache,
+    ignore_label,
 ):
     ds = input_pipeline.create_split(
         dataset_builder,
         batch_size,
         image_size=image_size,
+        min_resize_value=min_resize_value,
+        max_resize_value=max_resize_value,
+        base_image_size=base_image_size,
         dtype=dtype,
         train=train,
         cache=cache,
@@ -303,11 +325,16 @@ def create_train_state(
         dynamic_scale = None
 
     params, batch_stats = initialized(rngs, image_size, model)
-    tx = optax.sgd(
-        learning_rate=learning_rate_fn,
-        momentum=config.momentum,
-        nesterov=True,
-    )
+    if config.optimizer == "adam":
+        tx = optax.sgd(learning_rate=config.learning_rate)
+
+    elif config.optimizer == "sgd":
+        tx = optax.sgd(
+            learning_rate=learning_rate_fn,
+            momentum=config.momentum,
+            nesterov=True,
+        )
+
     state = TrainState.create(
         apply_fn=model.apply,
         params=params,
@@ -350,6 +377,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         dataset_builder,
         local_batch_size,
         config.image_size,
+        config.min_resize_value,
+        config.max_resize_value,
+        config.base_image_size,
         input_dtype,
         train=True,
         cache=config.cache,
@@ -359,6 +389,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         dataset_builder,
         local_batch_size,
         config.image_size,
+        config.min_resize_value,
+        config.max_resize_value,
+        config.base_image_size,
         input_dtype,
         train=False,
         cache=config.cache,
@@ -382,7 +415,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         steps_per_eval = config.steps_per_eval
 
     steps_per_checkpoint = steps_per_epoch
-    base_learning_rate = config.learning_rate * config.batch_size / 256.0
     model_cls = getattr(models, config.model)
     model = create_model(
         model_cls=model_cls,
@@ -390,9 +422,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         num_classes=num_classes,
     )
 
-    learning_rate_fn = create_learning_rate_fn(
-        config, base_learning_rate, steps_per_epoch
-    )
+    if config.optimizer == "sgd":
+        base_learning_rate = config.learning_rate * config.batch_size / 256.0
+        learning_rate_fn = create_learning_rate_fn(
+            config, base_learning_rate, steps_per_epoch
+        )
+    else:
+        learning_rate_fn = None
 
     state = create_train_state(rngs, config, model, config.image_size, learning_rate_fn)
     state = restore_checkpoint(state, workdir)
