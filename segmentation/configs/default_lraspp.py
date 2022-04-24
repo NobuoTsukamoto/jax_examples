@@ -16,7 +16,7 @@ def get_config():
 
     # As defined in the `models` module.
     config.model = "LRASPP_MobileNetV3_Small"
-    config.image_size = (768, 768)
+    config.image_size = (1024, 2048)
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
@@ -45,7 +45,7 @@ def get_config():
     # Data augmentation
     config.min_resize_value = 0.5
     config.max_resize_value = 2.0
-    config.base_image_size = (512, 1024)
+    config.base_image_size = (1024, 2048)
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
