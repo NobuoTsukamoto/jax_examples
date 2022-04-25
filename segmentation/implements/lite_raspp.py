@@ -65,7 +65,7 @@ class LiteRASPPHead(nn.Module):
         x = self.conv(self.num_classes, kernel_size=(1, 1))(x)
         y = self.conv(self.num_classes, kernel_size=(1, 1))(low_pos)
 
-        return x + y
+        return jnp.add(x, y)
 
 
 class MobileNetV3(nn.Module):
@@ -117,8 +117,8 @@ class MobileNetV3(nn.Module):
                     padding="SAME",
                     name=prefix + "expand_conv",
                 )(x)
-            x = self.norm(name=prefix + "expand_bn")(x)
-            x = act(x)
+                x = self.norm(name=prefix + "expand_bn")(x)
+                x = act(x)
 
             # Depthwise
             dw_filters = x.shape[-1]
@@ -153,7 +153,7 @@ class MobileNetV3(nn.Module):
             x = self.norm(name=prefix + "project_bn")(x)
 
             if in_filters == filters and strides == (1, 1):
-                x = x + inputs
+                x = jnp.add(x, inputs)
 
         if self.alpha > 1.0:
             filters = _make_divisible(x.shape[-1] * 6 * self.alpha, 8)

@@ -112,7 +112,10 @@ class InvertedResBlockMobileNetV3(nn.Module):
         inputs = x
         in_filters = x.shape[-1]
 
-        se_bolock = partial(SeBlock, conv=self.conv,)
+        se_bolock = partial(
+            SeBlock,
+            conv=self.conv,
+        )
 
         prefix = "block_{:02}_".format(self.block_id)
 
@@ -226,4 +229,4 @@ class SeBlock(nn.Module):
         x = self.conv(self.filters, kernel_size=(1, 1), padding="same")(x)
         x = jnn.hard_sigmoid(x)
 
-        return inputs * x
+        return jnp.multiply(inputs, x)
