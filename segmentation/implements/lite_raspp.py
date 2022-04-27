@@ -8,7 +8,7 @@
 """
 
 from functools import partial
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -32,7 +32,9 @@ class LiteRASPPHead(nn.Module):
     """Lite-ASPP Head Module."""
 
     num_classes: int
-    inter_filters: int = 128
+    aspp_convs_filters: int = 128
+    image_pooling_window_shape: Tuple[int, int] = (25, 25)
+    image_pooling_stride: Tuple[int, int] = (4, 5)
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
     act: Callable = nn.relu
@@ -41,14 +43,18 @@ class LiteRASPPHead(nn.Module):
     @nn.compact
     def __call__(self, high_pos, low_pos):
         # 1x1 conv + bn + relu
-        x = self.conv(self.inter_filters, kernel_size=(1, 1))(high_pos)
+        x = self.conv(self.aspp_convs_filters, kernel_size=(1, 1))(high_pos)
         x = self.norm()(x)
         x = self.act(x)
 
         # avg pool -> 1x1 conv -> sigmoid -> upsampling
         batch, height, width, _ = high_pos.shape
-        y = nn.avg_pool(high_pos, window_shape=(height, width))
-        y = self.conv(self.inter_filters, kernel_size=(1, 1))(y)
+        y = nn.avg_pool(
+            high_pos,
+            window_shape=self.image_pooling_window_shape,
+            strides=self.image_pooling_stride,
+        )
+        y = self.conv(self.aspp_convs_filters, kernel_size=(1, 1))(y)
         y = nn.sigmoid(y)
         y = jax.image.resize(
             y, shape=(batch, height, width, x.shape[-1]), method="bilinear"
@@ -108,7 +114,7 @@ class MobileNetV3(nn.Module):
             in_filters = x.shape[-1]
             prefix = "block_{:02}_".format(block_id)
 
-            if block_id != 1:
+            if block_id != 0:
                 # Expand
                 x = self.conv(
                     features=int(in_filters * expansion),
@@ -119,6 +125,7 @@ class MobileNetV3(nn.Module):
                 )(x)
                 x = self.norm(name=prefix + "expand_bn")(x)
                 x = act(x)
+                print("{:02}: expand    : {}".format(block_id, x.shape))
 
             # Depthwise
             dw_filters = x.shape[-1]
@@ -132,6 +139,7 @@ class MobileNetV3(nn.Module):
             )(x)
             x = self.norm(name=prefix + "depthwise_bn")(x)
             x = act(x)
+            print("{:02}: depthwise : {}".format(block_id, x.shape))
 
             if block_id == self.skip_layer:
                 low_pos = x
@@ -151,6 +159,7 @@ class MobileNetV3(nn.Module):
                 name=prefix + "project",
             )(x)
             x = self.norm(name=prefix + "project_bn")(x)
+            print("{:02}: project   : {}".format(block_id, x.shape))
 
             if in_filters == filters and strides == (1, 1):
                 x = jnp.add(x, inputs)
@@ -163,6 +172,8 @@ class MobileNetV3(nn.Module):
         x = self.conv(filters, kernel_size=(1, 1))(x)
         x = self.norm()(x)
         high_pos = self.h_swish(x)
+
+        print("final conv : ", high_pos.shape)
 
         return high_pos, low_pos
 
@@ -193,7 +204,7 @@ class LiteRASPP(nn.Module):
             conv=conv,
             norm=norm,
             num_classes=self.num_classes,
-            inter_filters=self.segmentation_head_filters,
+            aspp_convs_filters=self.segmentation_head_filters,
             dtype=self.dtype,
         )
 
@@ -213,34 +224,34 @@ class LiteRASPP(nn.Module):
 
 # fmt: off
 Large = {
-    "1": {"exp": 1, "filters": 16, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
-    "2": {"exp": 4, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
-    "3": {"exp": 3, "filters": 24, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
-    "4": {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": False},
+    "0": {"exp": 1, "filters": 16, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
+    "1": {"exp": 4, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
+    "2": {"exp": 3, "filters": 24, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
+    "3": {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": False},
+    "4": {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": False},
     "5": {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": False},
-    "6": {"exp": 3, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": False},
-    "7": {"exp": 6, "filters": 80, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": True},
-    "8": {"exp": 2.5, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
+    "6": {"exp": 6, "filters": 80, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": True},
+    "7": {"exp": 2.5, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
+    "8": {"exp": 2.3, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
     "9": {"exp": 2.3, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
-    "10": {"exp": 2.3, "filters": 80, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": True},
+    "10": {"exp": 6, "filters": 112, "kernel": (3, 3), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
     "11": {"exp": 6, "filters": 112, "kernel": (3, 3), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
-    "12": {"exp": 6, "filters": 112//2, "kernel": (3, 3), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    "12": {"exp": 6/2, "filters": 160//2, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
     "13": {"exp": 6, "filters": 160//2, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
     "14": {"exp": 6, "filters": 160//2, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
-    "15": {"exp": 6, "filters": 160//2, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
 }
 
 Small = {
-    "1": {"exp": 1, "filters": 16, "kernel": (3, 3), "strides": (2, 2), "se_ratio": 0.25, "h_swish": False},
-    "2": {"exp": 4.5, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
-    "3": {"exp": 88. / 24, "filters": 24, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
-    "4": {"exp": 4, "filters": 40, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
+    "0": {"exp": 1, "filters": 16, "kernel": (3, 3), "strides": (2, 2), "se_ratio": 0.25, "h_swish": False},
+    "1": {"exp": 4.5, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
+    "2": {"exp": 88. / 24, "filters": 24, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
+    "3": {"exp": 4, "filters": 40, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
+    "4": {"exp": 6, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
     "5": {"exp": 6, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
-    "6": {"exp": 6, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    "6": {"exp": 3, "filters": 48, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
     "7": {"exp": 3, "filters": 48, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
-    "8": {"exp": 3, "filters": 48//2, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
+    "8": {"exp": 6/2, "filters": 96//2, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
     "9": {"exp": 6, "filters": 96//2, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
     "10": {"exp": 6, "filters": 96//2, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
-    "11": {"exp": 6, "filters": 96//2, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
 }
 # fmt: on
