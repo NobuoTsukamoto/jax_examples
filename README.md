@@ -11,8 +11,9 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 - [ ] Implementation of inference code.
 - [ ] Export TensorFlow Saved Mdoel or ONNX model, etc...
 - [ ] Add more models...
-  - [ ] Segmentation model (LR-RASPP).
+  - [x] Segmentation model (LR-RASPP).
   - [ ] Object detection model.
+  - [ ] GAN model.
 - [ ] Training with Colab TPU.
 
 
@@ -39,6 +40,7 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 | Paper's | URL |
 |:-- |:--|
 |Fast-SCNN: Fast Semantic Segmentation Network | https://arxiv.org/abs/1902.04502 |
+| Searching for MobileNetV3 | https://arxiv.org/abs/1905.02244 |
 
 # Installation
 

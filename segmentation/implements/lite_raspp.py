@@ -125,7 +125,6 @@ class MobileNetV3(nn.Module):
                 )(x)
                 x = self.norm(name=prefix + "expand_bn")(x)
                 x = act(x)
-                print("{:02}: expand    : {}".format(block_id, x.shape))
 
             # Depthwise
             dw_filters = x.shape[-1]
@@ -139,7 +138,6 @@ class MobileNetV3(nn.Module):
             )(x)
             x = self.norm(name=prefix + "depthwise_bn")(x)
             x = act(x)
-            print("{:02}: depthwise : {}".format(block_id, x.shape))
 
             if block_id == self.skip_layer:
                 low_pos = x
@@ -159,7 +157,6 @@ class MobileNetV3(nn.Module):
                 name=prefix + "project",
             )(x)
             x = self.norm(name=prefix + "project_bn")(x)
-            print("{:02}: project   : {}".format(block_id, x.shape))
 
             if in_filters == filters and strides == (1, 1):
                 x = jnp.add(x, inputs)
@@ -172,8 +169,6 @@ class MobileNetV3(nn.Module):
         x = self.conv(filters, kernel_size=(1, 1))(x)
         x = self.norm()(x)
         high_pos = self.h_swish(x)
-
-        print("final conv : ", high_pos.shape)
 
         return high_pos, low_pos
 
