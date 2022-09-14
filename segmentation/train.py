@@ -20,7 +20,7 @@ import tensorflow_datasets as tfds
 from absl import logging
 from clu import metric_writers, periodic_actions
 from flax import jax_utils
-from flax.optim import dynamic_scale as dynamic_scale_lib
+from flax.training import dynamic_scale as dynamic_scale_lib
 from flax.training import checkpoints, common_utils, train_state
 from jax import lax
 from jax.config import config
@@ -165,7 +165,7 @@ def train_step(
             rngs={"dropout": dropout_rng},
         )
         loss = cross_entropy_loss(logits, batch["label"], num_classes, ignore_label)
-        weight_penalty_params = jax.tree_leaves(params)
+        weight_penalty_params = jax.tree_util.tree_leaves(params)
         weight_decay = 0.00004
         weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
         weight_penalty = weight_decay * 0.5 * weight_l2
@@ -201,15 +201,15 @@ def train_step(
         # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
         # params should be restored (= skip this step).
         new_state = new_state.replace(
-            opt_state=jax.tree_multimap(
+            opt_state=jax.tree_util.tree_map(
                 functools.partial(jnp.where, is_fin),
                 new_state.opt_state,
-                state.opt_state,
-            ),
-            params=jax.tree_multimap(
-                functools.partial(jnp.where, is_fin), new_state.params, state.params
-            ),
-        )
+                state.opt_state),
+            params=jax.tree_util.tree_map(
+                functools.partial(jnp.where, is_fin),
+                new_state.params,
+                state.params),
+            dynamic_scale=dynamic_scale)
         metrics["scale"] = dynamic_scale.scale
 
     return new_state, metrics, new_dropout_rng
@@ -235,7 +235,7 @@ def prepare_tf_data(xs):
         # (local_devices, device_batch_size, height, width, 3)
         return x.reshape((local_device_count, -1) + x.shape[1:])
 
-    return jax.tree_map(_prepare, xs)
+    return jax.tree_util.tree_map(_prepare, xs)
 
 
 def create_input_iter(
@@ -292,7 +292,7 @@ def get_input_dtype(half_precision):
 def save_checkpoint(state, workdir):
     if jax.process_index() == 0:
         # get train state from the first replica
-        state = jax.device_get(jax.tree_map(lambda x: x[0], state))
+        state = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
         step = int(state.step)
         checkpoints.save_checkpoint(workdir, state, step, keep=3)
 
@@ -479,7 +479,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
                 train_metrics = common_utils.get_metrics(train_metrics)
                 summary = {
                     f"train_{k}": v
-                    for k, v in jax.tree_map(lambda x: x.mean(), train_metrics).items()
+                    for k, v in jax.tree_util.tree_map(lambda x: x.mean(), train_metrics).items()
                 }
                 summary["steps_per_second"] = config.log_every_steps / (
                     time.time() - train_metrics_last_t
@@ -500,7 +500,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
                 eval_metrics.append(metrics)
 
             eval_metrics = common_utils.get_metrics(eval_metrics)
-            summary = jax.tree_map(lambda x: x.mean(), eval_metrics)
+            summary = jax.tree_util.tree_map(lambda x: x.mean(), eval_metrics)
             logging.info(
                 "eval epoch: %d, loss: %.4f, miou: %.4f, class accuracy: %.4f, pixel accuracy: %.4f",
                 epoch,
