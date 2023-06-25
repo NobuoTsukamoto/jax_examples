@@ -101,6 +101,10 @@ class Augment(tf.keras.layers.Layer):
         inputs = self.inputs_random_flip(inputs)
         inputs = self.inputs_random_contrast(inputs)
 
+        inputs = tf.image.resize(
+            inputs, self.image_size, method=tf.image.ResizeMethod.BILINEAR
+        )
+
         labels = tf.image.resize(
             labels,
             (new_height, new_width),
@@ -114,6 +118,12 @@ class Augment(tf.keras.layers.Layer):
         )
         labels = self.labels_random_crop(labels)
         labels = self.labels_random_flip(labels)
+
+        labels = tf.image.resize(
+            labels,
+            self.image_size,
+            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+        )
 
         inputs, labels = normalize_image(inputs, labels, dtype=self.dtype)
 
@@ -206,11 +216,12 @@ def create_split(
         ds = ds.cache()
 
     if train:
-        ds = ds.shuffle(32 * batch_size, seed=42)
+        ds = ds.shuffle(64 * batch_size, seed=42)
         ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
         ds = ds.map(
             Augment(
+                image_size=image_size,
                 crop_size=image_size,
                 base_image_size=base_image_size,
                 min_resize_value=min_resize_value,

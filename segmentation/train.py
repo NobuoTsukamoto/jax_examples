@@ -108,7 +108,16 @@ def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
     )
 
 
-def compute_metrics(logits, labels, num_classes, ignore_label, class_weights=None):
+def train_compute_metrics(logits, labels, num_classes, ignore_label, class_weights=None):
+    loss = cross_entropy_loss(logits, labels, num_classes, ignore_label, class_weights)
+    metrics = {
+        "loss": loss,
+    }
+    metrics = lax.pmean(metrics, axis_name="batch")
+    return metrics
+
+
+def eval_compute_metrics(logits, labels, num_classes, ignore_label, class_weights=None):
     loss = cross_entropy_loss(logits, labels, num_classes, ignore_label, class_weights)
     segmentation_metrics = semantic_segmentation_metrics(
         logits, labels, num_classes, ignore_label
@@ -187,7 +196,7 @@ def train_step(
         # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
         grads = lax.pmean(grads, axis_name="batch")
     new_model_state, logits = aux[1]
-    metrics = compute_metrics(
+    metrics = train_compute_metrics(
         logits, batch["label"], num_classes, ignore_label, class_weights
     )
 
@@ -218,7 +227,7 @@ def train_step(
 def eval_step(state, batch, num_classes, ignore_label, class_weights=None):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
-    return compute_metrics(
+    return eval_compute_metrics(
         logits, batch["label"], num_classes, ignore_label, class_weights
     )
 
