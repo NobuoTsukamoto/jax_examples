@@ -10,21 +10,21 @@ import functools
 import time
 from typing import Any
 
+import input_pipeline
 import jax
 import jax.numpy as jnp
 import ml_collections
+import models
 import optax
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from absl import logging
 from clu import metric_writers, periodic_actions
 from flax import jax_utils
+from flax.training import checkpoints, common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
-from flax.training import checkpoints, common_utils, train_state
-from jax import lax
-
-import input_pipeline
-import models
+from flax.training import train_state
+from jax import lax, random
 
 """ Training Image classfication model.
 
@@ -266,7 +266,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         logdir=workdir, just_logging=jax.process_index() != 0
     )
 
-    rng = jax.random.PRNGKey(0)
+    rng = random.PRNGKey(0)
 
     if config.batch_size % jax.device_count() > 0:
         raise ValueError("Batch size must be divisible by the number of devices")
@@ -298,7 +298,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         dataset_builder.info.splits["train"].num_examples // config.batch_size
     )
 
-    if config.num_train_steps == -1:
+    if config.num_train_steps <= 0:
         num_steps = int(steps_per_epoch * config.num_epochs)
     else:
         num_steps = config.num_train_steps

@@ -44,6 +44,11 @@ def get_config():
     # config.class_weights = None
     # fmt: on
 
+    # Data augmentation
+    config.min_resize_value = 0.5
+    config.max_resize_value = 1.75
+    config.base_image_size = (1024, 2048)
+
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
     config.num_train_steps = -1
