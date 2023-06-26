@@ -29,8 +29,6 @@ import input_pipeline
 import models
 from miou_metrics import eval_semantic_segmentation
 
-config.update("jax_disable_jit", True)
-
 
 def create_model(*, model_cls, half_precision, num_classes, **kwargs):
     platform = jax.local_devices()[0].platform
