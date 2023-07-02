@@ -209,14 +209,14 @@ def create_split(
         )
 
     options = tf.data.Options()
-    options.threading.private_threadpool_size = 16
+    options.threading.private_threadpool_size = 8
     ds = ds.with_options(options)
 
     if cache:
         ds = ds.cache()
 
     if train:
-        ds = ds.shuffle(64 * batch_size, seed=42)
+        ds = ds.shuffle(2 * batch_size, seed=42)
         ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
         ds = ds.map(

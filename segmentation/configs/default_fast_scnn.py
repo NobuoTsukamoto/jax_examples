@@ -23,14 +23,14 @@ def get_config():
     config.num_classes = 19
 
     # Training param
-    config.optimizer = "sgd"
-    config.learning_rate = 0.01
+    config.optimizer = "adam"
+    config.learning_rate = 0.1
     config.warmup_epochs = 10.0
     config.momentum = 0.9
-    config.batch_size = 8
+    config.batch_size = 16
 
-    config.num_epochs = 500.0
-    config.log_every_steps = 10
+    config.num_epochs = 100000
+    config.log_every_steps = 250
 
     config.cache = False
     config.half_precision = False
@@ -52,7 +52,7 @@ def get_config():
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
     config.num_train_steps = -1
-    config.steps_per_eval = -1
+    config.steps_per_eval = 500
 
     config.ignore_label = 255
     return config

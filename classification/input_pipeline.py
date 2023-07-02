@@ -225,7 +225,7 @@ def create_split(
 
     if train:
         ds = ds.repeat()
-        ds = ds.shuffle(16 * batch_size, seed=0)
+        ds = ds.shuffle(16 * batch_size, seed=42)
 
     ds = ds.map(decode_example, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     ds = ds.batch(batch_size, drop_remainder=True)

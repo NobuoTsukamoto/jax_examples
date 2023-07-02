@@ -31,6 +31,70 @@ def _make_divisible(v, divisor=8, min_value=None):
     return new_v
 
 
+class ResidualBlockV2(nn.Module):
+    """Residual block v2"""
+
+    filters: int
+    conv: ModuleDef
+    norm: ModuleDef
+    act: Callable
+    name: str
+    strides: Tuple[int, int] = None
+    is_conv_shortcut: bool = False
+    dtype: Any = jnp.float32
+
+    @nn.compact
+    def __call__(self, inputs):
+        pre = self.norm(name=self.name + "_preact_bn")(inputs)
+        pre = self.act(pre)
+
+        if self.is_conv_shortcut:
+            shortcut = self.conv(
+                features=self.filters * 4,
+                kernel_size=(1, 1),
+                strides=self.strides,
+                padding="SAME",
+                name=self.name + "_0_conv",
+            )(pre)
+
+        elif self.strides is not None:
+            shortcut = nn.max_pool(pre, (1, 1), strides=self.strides, padding="SAME")
+
+        else:
+            shortcut = pre
+
+        x = self.conv(
+            features=self.filters,
+            kernel_size=(1, 1),
+            strides=(1, 1),
+            padding="SAME",
+            name=self.name + "_1_conv",
+        )(pre)
+        x = self.norm(name=self.name + "_1_bn")(x)
+        x = self.act(x)
+
+        x = self.conv(
+            features=self.filters,
+            kernel_size=(3, 3),
+            strides=(1, 1),
+            padding="SAME",
+            name=self.name + "_2_conv",
+        )(x)
+        x = self.norm(name=self.name + "_2_bn")(x)
+        x = self.act(x)
+
+        x = self.conv(
+            features=self.filters * 4,
+            kernel_size=(1, 1),
+            strides=self.strides,
+            padding="SAME",
+            name=self.name + "_3_conv",
+        )(x)
+        x = shortcut + x
+
+        return x
+
+
 class InvertedResBlock(nn.Module):
     """Inverted ResNet block."""
 
@@ -108,7 +172,6 @@ class InvertedResBlockMobileNetV3(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-
         inputs = x
         in_filters = x.shape[-1]
 
