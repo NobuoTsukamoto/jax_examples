@@ -58,13 +58,16 @@ class ResNetV2(nn.Module):
         for layer_id, layer_itmes in self.layers.items():
             x = residual_block_v2(
                 filters=layer_itmes["filters"],
+                strides=(1, 1),
                 is_conv_shortcut=True,
                 name=layer_id + "_block1",
             )(x)
 
             for i in range(2, layer_itmes["blocks"]):
                 x = residual_block_v2(
-                    filters=layer_itmes["filters"], name=layer_id + "_block" + str(i)
+                    filters=layer_itmes["filters"],
+                    strides=(1, 1),
+                    name=layer_id + "_block" + str(i),
                 )(x)
 
             x = residual_block_v2(
@@ -83,7 +86,7 @@ class ResNetV2(nn.Module):
 
 
 ResNet50V2_layer = {
-    "layer_2": {"filters": 64, "blocks": 3, "stride": (2, 2)},
+    "layer_2": {"filters": 64, "blocks": 3, "stride": (1, 1)},
     "layer_3": {"filters": 128, "blocks": 4, "stride": (2, 2)},
     "layer_4": {"filters": 256, "blocks": 6, "stride": (2, 2)},
     "layer_5": {"filters": 512, "blocks": 3, "stride": (2, 2)},
