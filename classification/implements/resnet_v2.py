@@ -51,7 +51,7 @@ class ResNetV2(nn.Module):
             kernel_size=(7, 7),
             strides=(2, 2),
             padding=[(3, 3), (3, 3)],
-            name="layler_1_conv",
+            name="layer_1_conv",
         )(x)
         x = nn.max_pool(x, (3, 3), strides=(2, 2), padding="SAME")
 
@@ -83,8 +83,8 @@ class ResNetV2(nn.Module):
 
 
 ResNet50V2_layer = {
-    "layler_2": {"filters": 64, "blocks": 3, "stride": (2, 2)},
-    "layler_3": {"filters": 128, "blocks": 4, "stride": (2, 2)},
-    "layler_4": {"filters": 256, "blocks": 6, "stride": (2, 2)},
-    "layler_5": {"filters": 512, "blocks": 3, "stride": (2, 2)},
+    "layer_2": {"filters": 64, "blocks": 3, "stride": (2, 2)},
+    "layer_3": {"filters": 128, "blocks": 4, "stride": (2, 2)},
+    "layer_4": {"filters": 256, "blocks": 6, "stride": (2, 2)},
+    "layer_5": {"filters": 512, "blocks": 3, "stride": (2, 2)},
 }
