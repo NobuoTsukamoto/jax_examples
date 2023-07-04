@@ -25,7 +25,9 @@ class ResNetV2Test(parameterized.TestCase):
     def test_resnet_v2_model(self):
         """Tests MobileNet V2 model definition and output (variables)."""
         rng = jax.random.PRNGKey(0)
-        model_def = ResNetV2(layers=ResNet50V2_layer, num_classes=1000, dtype=jnp.float32)
+        model_def = ResNetV2(
+            layers=ResNet50V2_layer, num_classes=1000, dtype=jnp.float32
+        )
         variables = model_def.init(rng, jnp.ones((1, 224, 224, 3), jnp.float32))
 
         self.assertLen(variables, 2)
