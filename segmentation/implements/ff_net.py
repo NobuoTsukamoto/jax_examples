@@ -75,6 +75,9 @@ class UpHead(nn.Module):
         # backbone
         # Stage-1 strides
         backbone_layers = []
+        if len(self.backbone_layers) < 4:
+            backbone_layers.insert(0, x)
+
         for i, layer_itmes in self.backbone_layers.items():
             for j in range(layer_itmes["blocks"]):
                 strides = (
@@ -225,8 +228,6 @@ class FFNet(nn.Module):
             features=self.seg_head_features, num_classes=self.num_classes
         )(x)
 
-        print(x.shape)
-
         return jnp.asarray(x, self.dtype)
 
 
@@ -241,7 +242,7 @@ Stem_B = {
 }
 
 Stem_C = {
-    "stem_conv_layer_1": {"features": 32, "kernel": (3, 3), "strides": (2, 2)},
+    "stem_conv_layer_1": {"features": 64, "kernel": (3, 3), "strides": (2, 2)},
     "stem_conv_layer_2": {"features": 64, "kernel": (3, 3), "strides": (2, 2)},
     "stem_conv_layer_3": {"features": 64, "kernel": (3, 3), "strides": (1, 1)},
 }
@@ -287,18 +288,18 @@ ResNet46N = {
 }
 ResNet122NS = {
     "layer_1": {"features": 64, "blocks": 16, "strides": (2, 2)},
-    "layer_2": {"features": 128, "blocks": 24, "strides": (2, 2)},
-    "layer_3": {"features": 256, "blocks": 20, "strides": (2, 2)},
+    "layer_2": {"features": 160, "blocks": 24, "strides": (2, 2)},
+    "layer_3": {"features": 320, "blocks": 20, "strides": (2, 2)},
 }
 ResNet74NS = {
     "layer_1": {"features": 64, "blocks": 8, "strides": (2, 2)},
-    "layer_2": {"features": 128, "blocks": 12, "strides": (2, 2)},
-    "layer_3": {"features": 256, "blocks": 16, "strides": (2, 2)},
+    "layer_2": {"features": 160, "blocks": 12, "strides": (2, 2)},
+    "layer_3": {"features": 320, "blocks": 16, "strides": (2, 2)},
 }
 ResNet46NS = {
     "layer_1": {"features": 64, "blocks": 6, "strides": (2, 2)},
-    "layer_2": {"features": 128, "blocks": 8, "strides": (2, 2)},
-    "layer_3": {"features": 256, "blocks": 8, "strides": (2, 2)},
+    "layer_2": {"features": 160, "blocks": 8, "strides": (2, 2)},
+    "layer_3": {"features": 320, "blocks": 8, "strides": (2, 2)},
 }
 
 
@@ -315,10 +316,10 @@ Up_B = {
     "up_sample_layer_4": {"features_1": 256, "features_2": 32},
 }
 Up_C = {
-    "up_sample_layer_1": {"features_1": 64, "features_2": 128},
-    "up_sample_layer_2": {"features_1": 64, "features_2": 16},
-    "up_sample_layer_3": {"features_1": 64, "features_2": 16},
-    "up_sample_layer_4": {"features_1": 64, "features_2": 16},
+    "up_sample_layer_1": {"features_1": 128, "features_2": 128},
+    "up_sample_layer_2": {"features_1": 128, "features_2": 16},
+    "up_sample_layer_3": {"features_1": 128, "features_2": 16},
+    "up_sample_layer_4": {"features_1": 128, "features_2": 16},
 }
 
 Seg_A = 512

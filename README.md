@@ -43,6 +43,7 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 | Fast-SCNN: Fast Semantic Segmentation Network | https://arxiv.org/abs/1902.04502 |
 | Searching for MobileNetV3 | https://arxiv.org/abs/1905.02244 |
 | Fully Convolutional Networks for Semantic Segmentation | https://arxiv.org/abs/1411.4038 |
+| Simple and Efficient Architectures for Semantic Segmentation | https://arxiv.org/abs/2206.08236 |
 
 # Installation
 
