@@ -11,7 +11,29 @@ from functools import partial
 from implements.fast_scnn import FastSCNN
 from implements.lite_raspp import LiteRASPP, MobileNetV3, Large, Small
 from implements.fcn import FCN, ResNet50V2_layer, ResNetV2Backbone
-
+from implements.ff_net import (
+    FFNet,
+    Stem_A,
+    Stem_B,
+    Stem_C,
+    Up_A,
+    Up_B,
+    Up_C,
+    Seg_A,
+    Seg_B,
+    Seg_C,
+    ResNet150,
+    ResNet150S,
+    ResNet101S,
+    ResNet78S,
+    ResNet122N,
+    ResNet74N,
+    ResNet46N,
+    ResNet122NS,
+    ResNet74NS,
+    ResNet46NS,
+)
+from implements.common_layer import ResNetBlock, BottleneckResNetBlock
 
 # FastSCNN
 Fast_SCNN = partial(FastSCNN)
@@ -27,6 +49,59 @@ LRASPP_MobileNetV3_Small = partial(
 )
 
 # FCN
-FCN_ResNetV2 = model_def = partial(
-    FCN, backbone=ResNetV2Backbone, layers=ResNet50V2_layer
+FCN_ResNetV2 = partial(FCN, backbone=ResNetV2Backbone, layers=ResNet50V2_layer)
+
+# FFNet-GPU-Large
+FFNet_ResNet122N_CBB = partial(
+    FFNet,
+    stem_layers=Stem_C,
+    backbone_layers=ResNet122N,
+    backbone_block=ResNetBlock,
+    up_sample_layers=Up_B,
+    seg_head_features=Seg_B,
+)
+FFNet_ResNet74N_CBB = partial(
+    FFNet,
+    stem_layers=Stem_C,
+    backbone_layers=ResNet74N,
+    backbone_block=ResNetBlock,
+    up_sample_layers=Up_B,
+    seg_head_features=Seg_B,
+)
+FFNet_ResNet46N_CBB = partial(
+    FFNet,
+    stem_layers=Stem_C,
+    backbone_layers=ResNet46N,
+    backbone_block=ResNetBlock,
+    up_sample_layers=Up_B,
+    seg_head_features=Seg_B,
+)
+
+# FFNet-Mobile
+FFNet_ResNet122NS_CCC = partial(
+    FFNet,
+    stem_layers=Stem_C,
+    backbone_layers=ResNet122NS,
+    backbone_block=ResNetBlock,
+    up_sample_layers=Up_C,
+    seg_head_features=Seg_C,
+    mode="Mobile",
+)
+FFNet_ResNet74NS_CCC = partial(
+    FFNet,
+    stem_layers=Stem_C,
+    backbone_layers=ResNet74NS,
+    backbone_block=ResNetBlock,
+    up_sample_layers=Up_C,
+    seg_head_features=Seg_C,
+    mode="Mobile",
+)
+FFNet_ResNet46NS_CCC = partial(
+    FFNet,
+    stem_layers=Stem_C,
+    backbone_layers=ResNet46NS,
+    backbone_block=ResNetBlock,
+    up_sample_layers=Up_C,
+    seg_head_features=Seg_C,
+    mode="Mobile",
 )

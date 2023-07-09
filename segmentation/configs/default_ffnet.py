@@ -15,7 +15,7 @@ def get_config():
     config = ml_collections.ConfigDict()
 
     # As defined in the `models` module.
-    config.model = "Fast_SCNN"
+    config.model = "FFNet_ResNet46N_CBB"
     config.image_size = (1024, 2048)
 
     # `name` argument of tensorflow_datasets.builder()
@@ -24,7 +24,7 @@ def get_config():
 
     # Training param
     config.optimizer = "sgd"
-    config.learning_rate = 0.02
+    config.learning_rate = 0.01
     config.warmup_epochs = 50
     config.momentum = 0.9
     config.batch_size = 8
@@ -47,7 +47,7 @@ def get_config():
     # Data augmentation
     config.min_resize_value = 0.5
     config.max_resize_value = 2.0
-    config.output_image_size = (128, 256)
+    config.output_image_size = (256, 512)
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.

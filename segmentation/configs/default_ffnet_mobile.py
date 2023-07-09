@@ -15,7 +15,7 @@ def get_config():
     config = ml_collections.ConfigDict()
 
     # As defined in the `models` module.
-    config.model = "Fast_SCNN"
+    config.model = "FFNet_ResNet46NS_CCC"
     config.image_size = (1024, 2048)
 
     # `name` argument of tensorflow_datasets.builder()
@@ -24,7 +24,7 @@ def get_config():
 
     # Training param
     config.optimizer = "sgd"
-    config.learning_rate = 0.02
+    config.learning_rate = 0.01
     config.warmup_epochs = 50
     config.momentum = 0.9
     config.batch_size = 8

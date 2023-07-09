@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2023 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -29,6 +29,33 @@ def _make_divisible(v, divisor=8, min_value=None):
     if new_v < 0.9 * v:
         new_v += divisor
     return new_v
+
+
+class ResNetBlock(nn.Module):
+    """ResNet block."""
+
+    features: int
+    conv: ModuleDef
+    norm: ModuleDef
+    act: Callable
+    strides: Tuple[int, int] = (1, 1)
+
+    @nn.compact
+    def __call__(self, x):
+        residual = x
+        y = self.conv(self.features, (3, 3), self.strides)(x)
+        y = self.norm()(y)
+        y = self.act(y)
+        y = self.conv(self.features, (3, 3))(y)
+        y = self.norm(scale_init=nn.initializers.zeros_init())(y)
+
+        if residual.shape != y.shape:
+            residual = self.conv(self.features, (1, 1), self.strides, name="conv_proj")(
+                residual
+            )
+            residual = self.norm(name="norm_proj")(residual)
+
+        return self.act(residual + y)
 
 
 class ResidualBlockV2(nn.Module):
@@ -93,6 +120,36 @@ class ResidualBlockV2(nn.Module):
         x = shortcut + x
 
         return x
+
+
+class BottleneckResNetBlock(nn.Module):
+    """Bottleneck ResNet block."""
+
+    features: int
+    conv: ModuleDef
+    norm: ModuleDef
+    act: Callable
+    strides: Tuple[int, int] = (1, 1)
+
+    @nn.compact
+    def __call__(self, x):
+        residual = x
+        y = self.conv(self.features, (1, 1))(x)
+        y = self.norm()(y)
+        y = self.act(y)
+        y = self.conv(self.features, (3, 3), self.strides)(y)
+        y = self.norm()(y)
+        y = self.act(y)
+        y = self.conv(self.features * 4, (1, 1))(y)
+        y = self.norm(scale_init=nn.initializers.zeros_init())(y)
+
+        if residual.shape != y.shape:
+            residual = self.conv(
+                self.features * 4, (1, 1), self.strides, name="conv_proj"
+            )(residual)
+            residual = self.norm(name="norm_proj")(residual)
+
+        return self.act(residual + y)
 
 
 class InvertedResBlock(nn.Module):

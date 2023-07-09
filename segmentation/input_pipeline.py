@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2023 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -35,9 +35,9 @@ LABEL_ID = np.asarray([255, 255, 255, 255, 255, 255,
 class Augment(tf.keras.layers.Layer):
     def __init__(
         self,
-        image_size=(1024, 2048),
-        crop_size=(512, 1024),
-        base_image_size=(512, 1024),
+        input_image_size=(1024, 2048),
+        crop_size=(1024, 2048),
+        output_image_size=(1024, 2048),
         min_resize_value=0.5,
         max_resize_value=2.0,
         ignore_label=255,
@@ -45,9 +45,9 @@ class Augment(tf.keras.layers.Layer):
         dtype=tf.float32,
     ):
         super().__init__()
-        self.image_size = image_size
+        self.input_image_size = input_image_size
         self.crop_size = crop_size
-        self.base_image_size = base_image_size
+        self.output_image_size = output_image_size
         self.min_resize_value = min_resize_value
         self.max_resize_value = max_resize_value
         self.ignore_label = ignore_label
@@ -73,24 +73,25 @@ class Augment(tf.keras.layers.Layer):
         resize_factor = self.random_resize_factor.uniform(
             self.min_resize_value, self.max_resize_value
         )
-        new_height = int(self.base_image_size[0] * resize_factor)
-        new_width = int(self.base_image_size[1] * resize_factor)
-
+        new_height = int(self.input_image_size[0] * resize_factor)
+        new_width = int(self.input_image_size[1] * resize_factor)
         inputs = tf.image.resize(
             inputs, (new_height, new_width), method=tf.image.ResizeMethod.BILINEAR
         )
         pad_along_height = (
-            self.image_size[0] - new_height if new_height < self.image_size[0] else 0
+            self.input_image_size[0] - new_height
+            if new_height < self.input_image_size[0]
+            else 0
         )
         pad_along_width = (
-            self.image_size[1] - new_width if new_width < self.image_size[1] else 0
+            self.input_image_size[1] - new_width
+            if new_width < self.input_image_size[1]
+            else 0
         )
-
         pad_top = pad_along_height // 2
         pad_bottom = pad_along_height - pad_top
         pad_left = pad_along_width // 2
         pad_right = pad_along_width - pad_left
-
         inputs = tf.pad(
             inputs,
             [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
@@ -100,10 +101,6 @@ class Augment(tf.keras.layers.Layer):
         inputs = self.inputs_random_crop(inputs)
         inputs = self.inputs_random_flip(inputs)
         inputs = self.inputs_random_contrast(inputs)
-
-        inputs = tf.image.resize(
-            inputs, self.image_size, method=tf.image.ResizeMethod.BILINEAR
-        )
 
         labels = tf.image.resize(
             labels,
@@ -118,13 +115,11 @@ class Augment(tf.keras.layers.Layer):
         )
         labels = self.labels_random_crop(labels)
         labels = self.labels_random_flip(labels)
-
         labels = tf.image.resize(
             labels,
-            self.image_size,
+            (self.output_image_size[0], self.output_image_size[1]),
             method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
         )
-
         inputs, labels = normalize_image(inputs, labels, dtype=self.dtype)
 
         return {"image": inputs, "label": labels}
@@ -149,10 +144,10 @@ def create_split(
     batch_size,
     train,
     dtype=tf.float32,
-    image_size=IMAGE_SIZE,
+    input_image_size=IMAGE_SIZE,
     min_resize_value=0.5,
     max_resize_value=2.0,
-    base_image_size=IMAGE_SIZE,
+    output_image_size=IMAGE_SIZE,
     cache=False,
     ignore_label=255,
 ):
@@ -190,11 +185,11 @@ def create_split(
 
         input_image, input_mask = normalize_image(input_image, input_mask, dtype=dtype)
         input_image = tf.image.resize(
-            input_image, image_size, method=tf.image.ResizeMethod.BILINEAR
+            input_image, input_image_size, method=tf.image.ResizeMethod.BILINEAR
         )
         input_image = tf.image.convert_image_dtype(input_image, dtype)
         input_mask = tf.image.resize(
-            input_mask, image_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
+            input_mask, output_image_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
         )
         input_mask = tf.cast(input_mask, dtype=tf.int32)
         return {"image": input_image, "label": input_mask}
@@ -221,9 +216,9 @@ def create_split(
         ds = ds.repeat()
         ds = ds.map(
             Augment(
-                image_size=image_size,
-                crop_size=image_size,
-                base_image_size=base_image_size,
+                input_image_size=input_image_size,
+                crop_size=input_image_size,
+                output_image_size=output_image_size,
                 min_resize_value=min_resize_value,
                 max_resize_value=max_resize_value,
                 ignore_label=ignore_label,

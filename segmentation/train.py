@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2023 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -238,10 +238,10 @@ def prepare_tf_data(xs):
 def create_input_iter(
     dataset_builder,
     batch_size,
-    image_size,
+    input_image_size,
     min_resize_value,
     max_resize_value,
-    base_image_size,
+    output_image_size,
     dtype,
     train,
     cache,
@@ -250,10 +250,10 @@ def create_input_iter(
     ds = input_pipeline.create_split(
         dataset_builder,
         batch_size,
-        image_size=image_size,
+        input_image_size=input_image_size,
         min_resize_value=min_resize_value,
         max_resize_value=max_resize_value,
-        base_image_size=base_image_size,
+        output_image_size=output_image_size,
         dtype=dtype,
         train=train,
         cache=cache,
@@ -376,7 +376,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         config.image_size,
         config.min_resize_value,
         config.max_resize_value,
-        config.base_image_size,
+        config.output_image_size,
         input_dtype,
         train=True,
         cache=config.cache,
@@ -388,7 +388,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         config.image_size,
         config.min_resize_value,
         config.max_resize_value,
-        config.base_image_size,
+        config.output_image_size,
         input_dtype,
         train=False,
         cache=config.cache,

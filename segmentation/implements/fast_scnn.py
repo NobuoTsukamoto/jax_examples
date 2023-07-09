@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2023 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -126,8 +126,6 @@ class FastSCNN(nn.Module):
             act=self.act,
         )
 
-        batch, height, width, _ = x.shape
-
         # Learning to Down-sample
         x = conv(32, kernel_size=(3, 3), strides=(2, 2), name="conv_init")(x)
         x = norm()(x)
@@ -160,7 +158,4 @@ class FastSCNN(nn.Module):
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
         x = conv(self.num_classes, kernel_size=(1, 1))(x)
 
-        x = jax.image.resize(
-            x, shape=(batch, height, width, self.num_classes), method="bilinear"
-        )
         return jnp.asarray(x, self.dtype)
