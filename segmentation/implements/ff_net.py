@@ -288,18 +288,18 @@ ResNet46N = {
 }
 ResNet122NS = {
     "layer_1": {"features": 64, "blocks": 16, "strides": (2, 2)},
-    "layer_2": {"features": 160, "blocks": 24, "strides": (2, 2)},
-    "layer_3": {"features": 320, "blocks": 20, "strides": (2, 2)},
+    "layer_2": {"features": 128, "blocks": 24, "strides": (2, 2)},
+    "layer_3": {"features": 256, "blocks": 20, "strides": (2, 2)},
 }
 ResNet74NS = {
     "layer_1": {"features": 64, "blocks": 8, "strides": (2, 2)},
-    "layer_2": {"features": 160, "blocks": 12, "strides": (2, 2)},
-    "layer_3": {"features": 320, "blocks": 16, "strides": (2, 2)},
+    "layer_2": {"features": 128, "blocks": 12, "strides": (2, 2)},
+    "layer_3": {"features": 256, "blocks": 16, "strides": (2, 2)},
 }
 ResNet46NS = {
     "layer_1": {"features": 64, "blocks": 6, "strides": (2, 2)},
-    "layer_2": {"features": 160, "blocks": 8, "strides": (2, 2)},
-    "layer_3": {"features": 320, "blocks": 8, "strides": (2, 2)},
+    "layer_2": {"features": 128, "blocks": 8, "strides": (2, 2)},
+    "layer_3": {"features": 256, "blocks": 8, "strides": (2, 2)},
 }
 
 
