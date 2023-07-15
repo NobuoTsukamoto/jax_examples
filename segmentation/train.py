@@ -162,12 +162,14 @@ def train_step(
             rngs={"dropout": dropout_rng},
         )
         loss = cross_entropy_loss(logits[0], batch["label"], num_classes, ignore_label)
-        aux_loss = cross_entropy_loss(logits[1], batch["label"], num_classes, ignore_label)
+        aux_loss = cross_entropy_loss(
+            logits[1], batch["label"], num_classes, ignore_label
+        )
         weight_penalty_params = jax.tree_util.tree_leaves(params)
         weight_decay = 0.00004
         weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
         weight_penalty = weight_decay * 0.5 * weight_l2
-        loss = loss + aux_loss * 0.3 + weight_penalty
+        loss = loss + aux_loss * 0.4 + weight_penalty
         return loss, (new_model_state, logits)
 
     step = state.step
@@ -202,12 +204,13 @@ def train_step(
             opt_state=jax.tree_util.tree_map(
                 functools.partial(jnp.where, is_fin),
                 new_state.opt_state,
-                state.opt_state),
+                state.opt_state,
+            ),
             params=jax.tree_util.tree_map(
-                functools.partial(jnp.where, is_fin),
-                new_state.params,
-                state.params),
-            dynamic_scale=dynamic_scale)
+                functools.partial(jnp.where, is_fin), new_state.params, state.params
+            ),
+            dynamic_scale=dynamic_scale,
+        )
         metrics["scale"] = dynamic_scale.scale
 
     return new_state, metrics, new_dropout_rng
@@ -481,7 +484,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
                 train_metrics = common_utils.get_metrics(train_metrics)
                 summary = {
                     f"train_{k}": v
-                    for k, v in jax.tree_util.tree_map(lambda x: x.mean(), train_metrics).items()
+                    for k, v in jax.tree_util.tree_map(
+                        lambda x: x.mean(), train_metrics
+                    ).items()
                 }
                 summary["steps_per_second"] = config.log_every_steps / (
                     time.time() - train_metrics_last_t
