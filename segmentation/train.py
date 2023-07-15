@@ -161,12 +161,13 @@ def train_step(
             mutable=["batch_stats"],
             rngs={"dropout": dropout_rng},
         )
-        loss = cross_entropy_loss(logits, batch["label"], num_classes, ignore_label)
+        loss = cross_entropy_loss(logits[0], batch["label"], num_classes, ignore_label)
+        aux_loss = cross_entropy_loss(logits[1], batch["label"], num_classes, ignore_label)
         weight_penalty_params = jax.tree_util.tree_leaves(params)
         weight_decay = 0.00004
         weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
         weight_penalty = weight_decay * 0.5 * weight_l2
-        loss = loss + weight_penalty
+        loss = loss + aux_loss * 0.3 + weight_penalty
         return loss, (new_model_state, logits)
 
     step = state.step
@@ -185,7 +186,7 @@ def train_step(
         grads = lax.pmean(grads, axis_name="batch")
     new_model_state, logits = aux[1]
     metrics = compute_metrics(
-        logits, batch["label"], num_classes, ignore_label, class_weights
+        logits[0], batch["label"], num_classes, ignore_label, class_weights
     )
 
     if learning_rate_fn is not None:
@@ -216,7 +217,7 @@ def eval_step(state, batch, num_classes, ignore_label, class_weights=None):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     return compute_metrics(
-        logits, batch["label"], num_classes, ignore_label, class_weights
+        logits[0], batch["label"], num_classes, ignore_label, class_weights
     )
 
 
@@ -239,6 +240,7 @@ def create_input_iter(
     dataset_builder,
     batch_size,
     input_image_size,
+    crop_image_size,
     min_resize_value,
     max_resize_value,
     output_image_size,
@@ -251,6 +253,7 @@ def create_input_iter(
         dataset_builder,
         batch_size,
         input_image_size=input_image_size,
+        crop_image_size=crop_image_size,
         min_resize_value=min_resize_value,
         max_resize_value=max_resize_value,
         output_image_size=output_image_size,
@@ -374,6 +377,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         dataset_builder,
         local_batch_size,
         config.image_size,
+        config.crop_image_size,
         config.min_resize_value,
         config.max_resize_value,
         config.output_image_size,
@@ -386,6 +390,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         dataset_builder,
         local_batch_size,
         config.image_size,
+        config.crop_image_size,
         config.min_resize_value,
         config.max_resize_value,
         config.output_image_size,

@@ -24,13 +24,13 @@ def get_config():
 
     # Training param
     config.optimizer = "sgd"
-    config.learning_rate = 0.02
-    config.warmup_epochs = 50
+    config.learning_rate = 0.03
+    config.warmup_epochs = 500
     config.momentum = 0.9
     config.batch_size = 8
 
     config.num_epochs = 100000
-    config.log_every_steps = 100
+    config.log_every_steps = 371
 
     config.cache = False
     config.half_precision = False
@@ -47,12 +47,13 @@ def get_config():
     # Data augmentation
     config.min_resize_value = 0.5
     config.max_resize_value = 2.0
-    config.output_image_size = (128, 256)
+    config.crop_image_size = (512, 1024)
+    config.output_image_size = (512, 1024)
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
     config.num_train_steps = -1
-    config.steps_per_eval = 500
+    config.steps_per_eval = -1
 
     config.ignore_label = 255
     return config

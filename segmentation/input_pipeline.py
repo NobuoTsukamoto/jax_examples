@@ -6,20 +6,24 @@
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
-from random import Random
+import math
+
 import numpy as np
 import jax
 import tensorflow as tf
+import tensorflow_datasets as tfds
 
 """ Input Pipline
 
     Besed on:
         https://github.com/google/flax/blob/main/examples/imagenet/input_pipeline.py
+        https://github.com/tensorflow/models/blob/master/official/vision/dataloaders/segmentation_input.py
+
 """
 
 IMAGE_SIZE = (1024, 2048)
-MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
-STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
+MEAN_RGB = [0.485, 0.456, 0.406]
+STDDEV_RGB = [0.229, 0.224, 0.225]
 
 # fmt: off
 # https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py#L52-L99
@@ -32,111 +36,235 @@ LABEL_ID = np.asarray([255, 255, 255, 255, 255, 255,
 # fmt: on
 
 
-class Augment(tf.keras.layers.Layer):
-    def __init__(
-        self,
-        input_image_size=(1024, 2048),
-        crop_size=(1024, 2048),
-        output_image_size=(1024, 2048),
-        min_resize_value=0.5,
-        max_resize_value=2.0,
-        ignore_label=255,
-        seed=42,
-        dtype=tf.float32,
-    ):
-        super().__init__()
-        self.input_image_size = input_image_size
-        self.crop_size = crop_size
-        self.output_image_size = output_image_size
-        self.min_resize_value = min_resize_value
-        self.max_resize_value = max_resize_value
-        self.ignore_label = ignore_label
-        self.input_dtype = dtype
-        self.random_resize_factor = Random(seed)
-        self.inputs_random_flip = tf.keras.layers.RandomFlip(
-            mode="horizontal", seed=seed
-        )
-        self.inputs_random_crop = tf.keras.layers.RandomCrop(
-            height=crop_size[0], width=crop_size[1], seed=seed
-        )
-        self.labels_random_flip = tf.keras.layers.RandomFlip(
-            mode="horizontal", seed=seed
-        )
-        self.labels_random_crop = tf.keras.layers.RandomCrop(
-            height=crop_size[0], width=crop_size[1], seed=seed
-        )
-        self.inputs_random_contrast = tf.keras.layers.RandomContrast(
-            factor=0.6, seed=seed
-        )
-
-    def call(self, inputs, labels):
-        resize_factor = self.random_resize_factor.uniform(
-            self.min_resize_value, self.max_resize_value
-        )
-        new_height = int(self.input_image_size[0] * resize_factor)
-        new_width = int(self.input_image_size[1] * resize_factor)
-        inputs = tf.image.resize(
-            inputs, (new_height, new_width), method=tf.image.ResizeMethod.BILINEAR
-        )
-        pad_along_height = (
-            self.input_image_size[0] - new_height
-            if new_height < self.input_image_size[0]
-            else 0
-        )
-        pad_along_width = (
-            self.input_image_size[1] - new_width
-            if new_width < self.input_image_size[1]
-            else 0
-        )
-        pad_top = pad_along_height // 2
-        pad_bottom = pad_along_height - pad_top
-        pad_left = pad_along_width // 2
-        pad_right = pad_along_width - pad_left
-        inputs = tf.pad(
-            inputs,
-            [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
-            mode="CONSTANT",
-            constant_values=0.0,
-        )
-        inputs = self.inputs_random_crop(inputs)
-        inputs = self.inputs_random_flip(inputs)
-        inputs = self.inputs_random_contrast(inputs)
-
-        labels = tf.image.resize(
-            labels,
-            (new_height, new_width),
-            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
-        )
-        labels = tf.pad(
-            labels,
-            [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
-            mode="CONSTANT",
-            constant_values=self.ignore_label,
-        )
-        labels = self.labels_random_crop(labels)
-        labels = self.labels_random_flip(labels)
-        labels = tf.image.resize(
-            labels,
-            (self.output_image_size[0], self.output_image_size[1]),
-            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
-        )
-        inputs, labels = normalize_image(inputs, labels, dtype=self.dtype)
-
-        return {"image": inputs, "label": labels}
+def _normalize_image(image):
+    image -= tf.constant(MEAN_RGB, shape=[1, 1, 3], dtype=image.dtype)
+    image /= tf.constant(STDDEV_RGB, shape=[1, 1, 3], dtype=image.dtype)
+    return image
 
 
-def normalize_image(input_image, input_mask, dtype=tf.float32):
-    input_image = tf.cast(input_image, dtype)
-    input_image -= tf.constant(MEAN_RGB, shape=[1, 1, 3], dtype=input_image.dtype)
-    input_image /= tf.constant(STDDEV_RGB, shape=[1, 1, 3], dtype=input_image.dtype)
+def _prepare_image_and_label(datapoint, input_image_size):
+    label = tf.io.decode_image(datapoint["segmentation_label"], channels=1)
+    label = tf.reshape(label, (1, input_image_size[0], input_image_size[1]))
 
-    input_mask = tf.cast(input_mask, dtype=tf.int32)
-    input_mask = tf.where(input_mask >= 34, 34, input_mask)
-    input_mask = tf.cast(
-        tf.gather(LABEL_ID, tf.cast(input_mask, dtype=tf.int32)), dtype=tf.uint8
+    image = tf.io.decode_image(datapoint["image_left"], 3, dtype=tf.uint8)
+    image = tf.reshape(image, (input_image_size[0], input_image_size[1], 3))
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image = _normalize_image(image)
+
+    label = tf.cast(label, dtype=tf.int32)
+    label = tf.where(label >= 34, 34, label)
+    label = tf.cast(tf.gather(LABEL_ID, tf.cast(label, dtype=tf.int32)), dtype=tf.uint8)
+    label = tf.cast(label, tf.float32)
+
+    return image, label
+
+
+def _random_horizontal_flip(image, label, seed=42, prob=0.5):
+    do_flip = tf.less(tf.random.uniform([], seed=seed), prob)
+    image = tf.cond(do_flip, lambda: tf.image.flip_left_right(image), lambda: image)
+    label = tf.cond(do_flip, lambda: label[:, :, ::-1], lambda: label)
+    return image, label
+
+
+def _resize_and_crop_image(
+    image,
+    desired_size,
+    padded_size,
+    aug_scale_min=1.0,
+    aug_scale_max=1.0,
+    seed=42,
+    method=tf.image.ResizeMethod.BILINEAR,
+):
+    image_size = tf.cast(tf.shape(image)[0:2], tf.float32)
+    random_jittering = not math.isclose(aug_scale_min, 1.0) or not math.isclose(
+        aug_scale_max, 1.0
     )
 
-    return input_image, input_mask
+    if random_jittering:
+        random_scale = tf.random.uniform([], aug_scale_min, aug_scale_max, seed=seed)
+        scaled_size = tf.round(random_scale * tf.cast(desired_size, tf.float32))
+    else:
+        scaled_size = tf.cast(desired_size, tf.float32)
+
+    scale = tf.minimum(scaled_size[0] / image_size[0], scaled_size[1] / image_size[1])
+    scaled_size = tf.round(image_size * scale)
+
+    # Computes 2D image_scale.
+    image_scale = scaled_size / image_size
+
+    # Selects non-zero random offset (x, y) if scaled image is larger than
+    # desired_size.
+    if random_jittering:
+        max_offset = scaled_size - tf.cast(desired_size, tf.float32)
+        max_offset = tf.where(
+            tf.less(max_offset, 0), tf.zeros_like(max_offset), max_offset
+        )
+        offset = max_offset * tf.random.uniform(
+            [
+                2,
+            ],
+            0,
+            1,
+            seed=seed,
+        )
+        offset = tf.cast(offset, tf.int32)
+    else:
+        offset = tf.zeros((2,), tf.int32)
+
+    scaled_image = tf.image.resize(image, tf.cast(scaled_size, tf.int32), method=method)
+
+    if random_jittering:
+        scaled_image = scaled_image[
+            offset[0] : offset[0] + desired_size[0],
+            offset[1] : offset[1] + desired_size[1],
+            :,
+        ]
+
+    output_image = scaled_image
+    if padded_size is not None:
+        output_image = tf.image.pad_to_bounding_box(
+            scaled_image, 0, 0, padded_size[0], padded_size[1]
+        )
+
+    image_info = tf.stack(
+        [
+            image_size,
+            tf.cast(desired_size, dtype=tf.float32),
+            image_scale,
+            tf.cast(offset, tf.float32),
+        ]
+    )
+    return output_image, image_info
+
+
+def _resize_and_crop_masks(masks, image_scale, output_size, offset):
+    mask_size = tf.cast(tf.shape(masks)[1:3], tf.float32)
+    num_channels = tf.shape(masks)[3]
+    # Pad masks to avoid empty mask annotations.
+    masks = tf.concat(
+        [
+            tf.zeros([1, mask_size[0], mask_size[1], num_channels], dtype=masks.dtype),
+            masks,
+        ],
+        axis=0,
+    )
+    scaled_size = tf.cast(image_scale * mask_size, tf.int32)
+    scaled_masks = tf.image.resize(
+        masks, scaled_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
+    )
+    offset = tf.cast(offset, tf.int32)
+    scaled_masks = scaled_masks[
+        :,
+        offset[0] : offset[0] + output_size[0],
+        offset[1] : offset[1] + output_size[1],
+        :,
+    ]
+
+    output_masks = tf.image.pad_to_bounding_box(
+        scaled_masks, 0, 0, output_size[0], output_size[1]
+    )
+    # Remove padding.
+    output_masks = output_masks[1::]
+    return output_masks
+
+
+def parse_train_data(
+    datapoint,
+    aug_scale_min,
+    aug_scale_max,
+    ignore_label=255,
+    crop_size=None,
+    input_image_size=IMAGE_SIZE,
+    output_image_size=None,
+    dtype=tf.float32,
+):
+    image, label = _prepare_image_and_label(datapoint, input_image_size)
+
+    if crop_size:
+        crop_size = list(crop_size)
+        label = tf.reshape(label, [input_image_size[0], input_image_size[1], 1])
+
+        if output_image_size:
+            image = tf.image.resize(image, output_image_size, method="bilinear")
+            label = tf.image.resize(label, output_image_size, method="nearest")
+
+        image_mask = tf.concat([image, label], axis=2)
+        image_mask_crop = tf.image.random_crop(
+            image_mask, crop_size + [tf.shape(image_mask)[-1]]
+        )
+        image = image_mask_crop[:, :, :-1]
+        label = tf.reshape(image_mask_crop[:, :, -1], [1] + crop_size)
+
+    # Flips image randomly during training.
+    image, label = _random_horizontal_flip(image, label)
+
+    train_image_size = crop_size if crop_size else output_image_size
+    # Resizes and crops image.
+    image, image_info = _resize_and_crop_image(
+        image,
+        train_image_size,
+        train_image_size,
+        aug_scale_min=aug_scale_min,
+        aug_scale_max=aug_scale_max,
+    )
+
+    # Resizes and crops boxes.
+    image_scale = image_info[2, :]
+    offset = image_info[3, :]
+
+    # Pad label and make sure the padded region assigned to the ignore label.
+    # The label is first offset by +1 and then padded with 0.
+    label += 1
+    label = tf.expand_dims(label, axis=3)
+    label = _resize_and_crop_masks(label, image_scale, train_image_size, offset)
+
+    label -= 1
+    label = tf.where(tf.equal(label, -1), ignore_label * tf.ones_like(label), label)
+    label = tf.squeeze(label, axis=0)
+    valid_mask = tf.not_equal(label, ignore_label)
+
+    # Cast image as self._dtype
+    image = tf.cast(image, dtype=dtype)
+    label = tf.cast(label, tf.uint8)
+
+    return image, label, valid_mask, image_info
+
+
+def parse_eval_data(
+    datapoint,
+    ignore_label=255,
+    input_image_size=IMAGE_SIZE,
+    output_image_size=None,
+    dtype=tf.float32,
+):
+    image, label = _prepare_image_and_label(datapoint, input_image_size)
+
+    # The label is first offset by +1 and then padded with 0.
+    label += 1
+    label = tf.expand_dims(label, axis=3)
+
+    # Resizes and crops image.
+    image, image_info = _resize_and_crop_image(
+        image, output_image_size, output_image_size
+    )
+
+    # Resizes eval masks to match input image sizes. In that case, mean IoU
+    # is computed on output_size not the original size of the images.
+    image_scale = image_info[2, :]
+    offset = image_info[3, :]
+    label = _resize_and_crop_masks(label, image_scale, output_image_size, offset)
+
+    label -= 1
+    label = tf.where(tf.equal(label, -1), ignore_label * tf.ones_like(label), label)
+    label = tf.squeeze(label, axis=0)
+
+    valid_mask = tf.not_equal(label, ignore_label)
+
+    # Cast image as self._dtype
+    image = tf.cast(image, dtype=dtype)
+    label = tf.cast(label, tf.uint8)
+
+    return image, label, valid_mask, image_info
 
 
 def create_split(
@@ -145,11 +273,12 @@ def create_split(
     train,
     dtype=tf.float32,
     input_image_size=IMAGE_SIZE,
+    output_image_size=None,
+    crop_image_size=None,
     min_resize_value=0.5,
     max_resize_value=2.0,
-    output_image_size=IMAGE_SIZE,
-    cache=False,
     ignore_label=255,
+    cache=False,
 ):
     """Creates a split from the ImageNet dataset using TensorFlow Datasets.
     Args:
@@ -163,6 +292,9 @@ def create_split(
     Returns:
         A `tf.data.Dataset`.
     """
+    shuffle_buffer_size = 16 * batch_size
+    prefetch = 10
+
     if train:
         train_examples = dataset_builder.info.splits["train"].num_examples
         split_size = train_examples // jax.process_count()
@@ -174,62 +306,53 @@ def create_split(
         start = jax.process_index() * split_size
         split = "validation[{}:{}]".format(start, start + split_size)
 
-    def load_image_train(datapoint):
-        input_image = datapoint["image_left"]
-        input_mask = datapoint["segmentation_label"]
-        return input_image, input_mask
+    def decode_example(example):
+        if train:
+            input_image, input_mask, _, _ = parse_train_data(
+                example,
+                min_resize_value,
+                max_resize_value,
+                ignore_label=ignore_label,
+                input_image_size=input_image_size,
+                output_image_size=output_image_size,
+                crop_size=crop_image_size,
+                dtype=dtype,
+            )
+        else:
+            input_image, input_mask, _, _ = parse_eval_data(
+                example,
+                ignore_label=ignore_label,
+                input_image_size=input_image_size,
+                output_image_size=output_image_size,
+                dtype=dtype,
+            )
 
-    def load_image_val(datapoint):
-        input_image = datapoint["image_left"]
-        input_mask = datapoint["segmentation_label"]
-
-        input_image, input_mask = normalize_image(input_image, input_mask, dtype=dtype)
-        input_image = tf.image.resize(
-            input_image, input_image_size, method=tf.image.ResizeMethod.BILINEAR
-        )
-        input_image = tf.image.convert_image_dtype(input_image, dtype)
-        input_mask = tf.image.resize(
-            input_mask, output_image_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
-        )
-        input_mask = tf.cast(input_mask, dtype=tf.int32)
         return {"image": input_image, "label": input_mask}
 
-    if train:
-        ds = dataset_builder.as_dataset(split=split).map(
-            load_image_train, num_parallel_calls=tf.data.AUTOTUNE
-        )
-    else:
-        ds = dataset_builder.as_dataset(split=split).map(
-            load_image_val, num_parallel_calls=tf.data.AUTOTUNE
-        )
-
+    ds = dataset_builder.as_dataset(
+        split=split,
+        decoders={
+            "image_left": tfds.decode.SkipDecoding(),
+            "segmentation_label": tfds.decode.SkipDecoding(),
+        },
+    )
     options = tf.data.Options()
-    options.threading.private_threadpool_size = 8
+    options.threading.private_threadpool_size = 48
     ds = ds.with_options(options)
 
     if cache:
         ds = ds.cache()
 
     if train:
-        ds = ds.shuffle(2 * batch_size, seed=42)
-        ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
-        ds = ds.map(
-            Augment(
-                input_image_size=input_image_size,
-                crop_size=input_image_size,
-                output_image_size=output_image_size,
-                min_resize_value=min_resize_value,
-                max_resize_value=max_resize_value,
-                ignore_label=ignore_label,
-                seed=42,
-            )
-        )
+        ds = ds.shuffle(shuffle_buffer_size, seed=42)
+
+    ds = ds.map(decode_example, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    ds = ds.batch(batch_size, drop_remainder=True)
 
     if not train:
-        ds = ds.batch(batch_size, drop_remainder=True)
         ds = ds.repeat()
 
-    ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+    ds = ds.prefetch(prefetch)
 
     return ds

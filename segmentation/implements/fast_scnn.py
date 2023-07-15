@@ -126,12 +126,23 @@ class FastSCNN(nn.Module):
             act=self.act,
         )
 
+        batch, height, width, _ = x.shape
+
         # Learning to Down-sample
         x = conv(32, kernel_size=(3, 3), strides=(2, 2), name="conv_init")(x)
         x = norm()(x)
         x = self.act(x)
         x = depthwise_separable_conv(48, strides=(2, 2))(x)
         high_res = depthwise_separable_conv(64, strides=(2, 2))(x)
+
+        # aux loss
+        aux_loss = conv(self.num_classes, kernel_size=(1, 1))(high_res)
+        aux_loss = jax.image.resize(
+            aux_loss,
+            shape=(batch, height, width, self.num_classes),
+            method="bilinear",
+        )
+        aux_loss = jnp.asarray(aux_loss, self.dtype)
 
         # Global Feature Extractor
         x = bottlenck(filters=64, strides=(2, 2), expansion=6, block_id=0)(high_res)
@@ -158,4 +169,8 @@ class FastSCNN(nn.Module):
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
         x = conv(self.num_classes, kernel_size=(1, 1))(x)
 
-        return jnp.asarray(x, self.dtype)
+        x = jax.image.resize(
+            x, shape=(batch, height, width, self.num_classes), method="bilinear"
+        )
+        x = jnp.asarray(x, self.dtype)
+        return (x, aux_loss)
