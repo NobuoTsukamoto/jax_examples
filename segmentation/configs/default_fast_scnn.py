@@ -24,12 +24,12 @@ def get_config():
 
     # Training param
     config.optimizer = "sgd"
-    config.learning_rate = 0.03
-    config.warmup_epochs = 500
+    config.learning_rate = 0.04
+    config.warmup_epochs = 1.0
     config.momentum = 0.9
     config.batch_size = 8
 
-    config.num_epochs = 100000
+    config.num_epochs = 1000
     config.log_every_steps = 371
 
     config.cache = False

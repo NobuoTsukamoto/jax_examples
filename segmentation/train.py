@@ -165,9 +165,15 @@ def train_step(
         aux_loss = cross_entropy_loss(
             logits[1], batch["label"], num_classes, ignore_label
         )
-        weight_penalty_params = jax.tree_util.tree_leaves(params)
         weight_decay = 0.00004
-        weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
+        # weight_penalty_params = jax.tree_util.tree_leaves(params)
+        # weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
+        weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
+        weight_l2 = sum(
+            jnp.sum(x[1] ** 2)
+            for x in weight_penalty_params
+            if x[1].ndim > 1 and "DepthwiseSeparable" not in x[0][0].key
+        )
         weight_penalty = weight_decay * 0.5 * weight_l2
         loss = loss + aux_loss * 0.4 + weight_penalty
         return loss, (new_model_state, logits)
@@ -428,7 +434,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
     )
 
     if config.optimizer == "sgd":
-        base_learning_rate = config.learning_rate * config.batch_size / 256.0
+        base_learning_rate = config.learning_rate
+        #base_learning_rate = config.learning_rate * config.batch_size / 256.0
         learning_rate_fn = create_learning_rate_fn(
             config, base_learning_rate, steps_per_epoch
         )
