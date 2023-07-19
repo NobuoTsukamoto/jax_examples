@@ -99,6 +99,7 @@ class FastSCNN(nn.Module):
     """Fast-SCNN."""
 
     num_classes: int
+    output_size: tuple[int, int]
     dtype: Any = jnp.float32
     conv: ModuleDef = nn.Conv
     act: Callable = nn.relu
@@ -126,7 +127,12 @@ class FastSCNN(nn.Module):
             act=self.act,
         )
 
-        batch, height, width, _ = x.shape
+        output_shape = (
+            x.shape[0],
+            self.output_size[0],
+            self.output_size[1],
+            self.num_classes,
+        )
 
         # Learning to Down-sample
         x = conv(32, kernel_size=(3, 3), strides=(2, 2), name="conv_init")(x)
@@ -139,7 +145,7 @@ class FastSCNN(nn.Module):
         aux_loss = conv(self.num_classes, kernel_size=(1, 1))(high_res)
         aux_loss = jax.image.resize(
             aux_loss,
-            shape=(batch, height, width, self.num_classes),
+            shape=output_shape,
             method="bilinear",
         )
         aux_loss = jnp.asarray(aux_loss, self.dtype)
@@ -170,7 +176,9 @@ class FastSCNN(nn.Module):
         x = conv(self.num_classes, kernel_size=(1, 1))(x)
 
         x = jax.image.resize(
-            x, shape=(batch, height, width, self.num_classes), method="bilinear"
+            x,
+            shape=output_shape,
+            method="bilinear",
         )
         x = jnp.asarray(x, self.dtype)
-        return (x, aux_loss)
+        return {"output": x, "aux_loss": aux_loss}

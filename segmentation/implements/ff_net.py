@@ -186,6 +186,7 @@ class FFNet(nn.Module):
     backbone_block: ModuleDef
     up_sample_layers: Dict
     seg_head_features: int
+    output_size: tuple[int, int]
     num_classes: int
     mode: str = "GPU-Large"  # GPU-Large, GPU-Small, Mobile
     conv: ModuleDef = nn.Conv
@@ -202,6 +203,8 @@ class FFNet(nn.Module):
             epsilon=1e-5,
             dtype=self.dtype,
         )
+
+        batch = x.shape[0]
 
         # up sampling mode
         resize_method = "bilinear" if self.mode == "mobile" else "nearest"
@@ -220,19 +223,27 @@ class FFNet(nn.Module):
             backbone_block=self.backbone_block,
             up_sample_filters=self.up_sample_layers,
             resize_method=resize_method,
-            mode=self.mode
+            mode=self.mode,
         )(x)
 
         # Segmentation-head
         x = segmentation_head(
             features=self.seg_head_features, num_classes=self.num_classes
         )(x)
-
-        return jnp.asarray(x, self.dtype)
+        x = jax.image.resize(
+            x,
+            shape=(batch, self.output_size[0], self.output_size[1], self.num_classes),
+            method="bilinear",
+        )
+        return {"output": jnp.asarray(x, self.dtype)}
 
 
 Stem_A = {
-    "stem_conv_layer_1": {"features": 32, "kernel": (7, 7), "strides": (2, 2)},
+    "stem_conv_layeroutput_size_1": {
+        "features": 32,
+        "kernel": (7, 7),
+        "strides": (2, 2),
+    },
     "stem_pool_layer_2": {"kernel": (3, 3), "strides": (2, 2)},
 }
 

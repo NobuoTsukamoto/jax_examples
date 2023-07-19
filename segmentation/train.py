@@ -29,7 +29,7 @@ import models
 from miou_metrics import eval_semantic_segmentation
 
 
-def create_model(*, model_cls, half_precision, num_classes, **kwargs):
+def create_model(*, model_cls, half_precision, num_classes, output_size, **kwargs):
     platform = jax.local_devices()[0].platform
     if half_precision:
         if platform == "tpu":
@@ -38,7 +38,9 @@ def create_model(*, model_cls, half_precision, num_classes, **kwargs):
             model_dtype = jnp.float16
     else:
         model_dtype = jnp.float32
-    return model_cls(num_classes=num_classes, dtype=model_dtype, **kwargs)
+    return model_cls(
+        num_classes=num_classes, output_size=output_size, dtype=model_dtype, **kwargs
+    )
 
 
 def initialized(key, image_size, model):
@@ -161,10 +163,14 @@ def train_step(
             mutable=["batch_stats"],
             rngs={"dropout": dropout_rng},
         )
-        loss = cross_entropy_loss(logits[0], batch["label"], num_classes, ignore_label)
-        aux_loss = cross_entropy_loss(
-            logits[1], batch["label"], num_classes, ignore_label
+        loss = cross_entropy_loss(
+            logits["output"], batch["label"], num_classes, ignore_label
         )
+        aux_loss = 0
+        if "aux_loss" in logits:
+            aux_loss = 0.4 * cross_entropy_loss(
+                logits["aux_loss"], batch["label"], num_classes, ignore_label
+            )
         weight_decay = 0.00004
         # weight_penalty_params = jax.tree_util.tree_leaves(params)
         # weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
@@ -175,7 +181,7 @@ def train_step(
             if x[1].ndim > 1 and "DepthwiseSeparable" not in x[0][0].key
         )
         weight_penalty = weight_decay * 0.5 * weight_l2
-        loss = loss + aux_loss * 0.4 + weight_penalty
+        loss = loss + aux_loss + weight_penalty
         return loss, (new_model_state, logits)
 
     step = state.step
@@ -194,7 +200,7 @@ def train_step(
         grads = lax.pmean(grads, axis_name="batch")
     new_model_state, logits = aux[1]
     metrics = compute_metrics(
-        logits[0], batch["label"], num_classes, ignore_label, class_weights
+        logits["output"], batch["label"], num_classes, ignore_label, class_weights
     )
 
     if learning_rate_fn is not None:
@@ -226,7 +232,7 @@ def eval_step(state, batch, num_classes, ignore_label, class_weights=None):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     return compute_metrics(
-        logits[0], batch["label"], num_classes, ignore_label, class_weights
+        logits["output"], batch["label"], num_classes, ignore_label, class_weights
     )
 
 
@@ -409,6 +415,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         ignore_label=config.ignore_label,
     )
     num_classes = config.num_classes
+    output_size = config.output_image_size
 
     steps_per_epoch = (
         dataset_builder.info.splits["train"].num_examples // config.batch_size
@@ -431,11 +438,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         model_cls=model_cls,
         half_precision=config.half_precision,
         num_classes=num_classes,
+        output_size=output_size,
     )
 
     if config.optimizer == "sgd":
         base_learning_rate = config.learning_rate
-        #base_learning_rate = config.learning_rate * config.batch_size / 256.0
+        # base_learning_rate = config.learning_rate * config.batch_size / 256.0
         learning_rate_fn = create_learning_rate_fn(
             config, base_learning_rate, steps_per_epoch
         )
