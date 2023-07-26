@@ -34,11 +34,7 @@ class MobileNetV1Test(parameterized.TestCase):
         variables = model_def.init(rng, jnp.ones((8, 224, 224, 3), jnp.float32))
 
         self.assertLen(variables, 2)
-        # MobileNet model will create parameters for the following layers:
-        #   conv + batch_norm = 2
-        #   DepthwiseSeparable layer = 13
-        #   conv = 1
-        self.assertLen(variables["params"], 16)
+        self.assertLen(variables["params"], 2)
 
         print(parameter_overview.get_parameter_overview(variables))
 

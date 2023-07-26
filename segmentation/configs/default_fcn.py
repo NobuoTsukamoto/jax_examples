@@ -16,7 +16,7 @@ def get_config():
 
     # As defined in the `models` module.
     config.model = "FCN_ResNetV2"
-    config.image_size = (256, 512)
+    config.image_size = (1024, 2048)
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
@@ -45,7 +45,7 @@ def get_config():
     # Data augmentation
     config.min_resize_value = 0.25
     config.max_resize_value = 0.75
-    config.base_image_size = (1024, 2048)
+    config.output_image_size = (512, 1024)
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.

@@ -13,7 +13,7 @@ from typing import Any, Callable
 import jax.numpy as jnp
 from flax import linen as nn
 
-from .common_layer import DepthwiseSeparable
+from common_layer import DepthwiseSeparable
 
 ModuleDef = Any
 
@@ -25,6 +25,56 @@ ModuleDef = Any
 
         https://github.com/keras-team/keras-applications/blob/dda499735da01ab6c6f029b37dbdf35cc82db136/keras_applications/mobilenet.py
 """
+
+
+class MobileNetV1Backbone(nn.Module):
+    """MobileNet V1 backbone."""
+
+    alpha: float
+    depth_multiplier: float
+    num_classes: int
+    conv: ModuleDef = nn.Conv
+    norm: ModuleDef = nn.BatchNorm
+    act: Callable = nn.relu
+    dtype: Any = jnp.float32
+
+    @nn.compact
+    def __call__(self, x):
+        depthwise_separable_conv = partial(
+            DepthwiseSeparable,
+            self.conv,
+            self.norm,
+            self.act,
+            depth_multiplier=self.depth_multiplier,
+            alpha=self.alpha,
+        )
+
+        first_block_filters = int(32 * self.alpha)
+        x = self.conv(
+            first_block_filters,
+            kernel_size=(3, 3),
+            strides=(2, 2),
+            padding="same",
+            name="conv_init",
+        )(x)
+        x = self.norm()(x)
+        x = self.act(x)
+
+        x = depthwise_separable_conv(64, strides=(1, 1))(x)
+        x = depthwise_separable_conv(128, strides=(2, 2))(x)
+        x = depthwise_separable_conv(128, strides=(1, 1))(x)
+        x = depthwise_separable_conv(256, strides=(2, 2))(x)
+        x = depthwise_separable_conv(256, strides=(1, 1))(x)
+        x = depthwise_separable_conv(512, strides=(2, 2))(x)
+        x = depthwise_separable_conv(512, strides=(1, 1))(x)
+        x = depthwise_separable_conv(512, strides=(1, 1))(x)
+        x = depthwise_separable_conv(512, strides=(1, 1))(x)
+        x = depthwise_separable_conv(512, strides=(1, 1))(x)
+        x = depthwise_separable_conv(512, strides=(1, 1))(x)
+        x = depthwise_separable_conv(1024, strides=(2, 2))(x)
+        x = depthwise_separable_conv(1024, strides=(1, 1))(x)
+
+        return x
 
 
 class MobileNetV1(nn.Module):
@@ -46,44 +96,21 @@ class MobileNetV1(nn.Module):
             epsilon=1e-5,
             dtype=self.dtype,
         )
-        depthwise_separable_conv = partial(
-            DepthwiseSeparable,
-            conv,
-            norm,
-            self.act,
-            depth_multiplier=self.depth_multiplier,
+        backbone = partial(
+            MobileNetV1Backbone,
             alpha=self.alpha,
+            depth_multiplier=self.depth_multiplier,
+            num_classes=self.num_classes,
+            conv=conv,
+            norm=norm,
+            act=self.act
         )
 
-        first_block_filters = int(32 * self.alpha)
-        x = conv(
-            first_block_filters,
-            kernel_size=(3, 3),
-            strides=(2, 2),
-            padding="same",
-            name="conv_init",
-        )(x)
-        x = norm()(x)
-        x = self.act(x)
-
-        x = depthwise_separable_conv(64, strides=(1, 1))(x)
-        x = depthwise_separable_conv(128, strides=(2, 2))(x)
-        x = depthwise_separable_conv(128, strides=(1, 1))(x)
-        x = depthwise_separable_conv(256, strides=(2, 2))(x)
-        x = depthwise_separable_conv(256, strides=(1, 1))(x)
-        x = depthwise_separable_conv(512, strides=(2, 2))(x)
-        x = depthwise_separable_conv(512, strides=(1, 1))(x)
-        x = depthwise_separable_conv(512, strides=(1, 1))(x)
-        x = depthwise_separable_conv(512, strides=(1, 1))(x)
-        x = depthwise_separable_conv(512, strides=(1, 1))(x)
-        x = depthwise_separable_conv(512, strides=(1, 1))(x)
-        x = depthwise_separable_conv(1024, strides=(2, 2))(x)
-        x = depthwise_separable_conv(1024, strides=(1, 1))(x)
+        x = backbone()(x)
 
         shape = (x.shape[0], 1, 1, int(1024 * self.alpha))
         x = jnp.mean(x, axis=(1, 2))
         x = x.reshape(shape)
         x = conv(self.num_classes, kernel_size=(1, 1))(x)
         x = x.reshape((x.shape[0], -1))  # flatten
-        x = jnp.asarray(x, self.dtype)
-        return x
+        return jnp.asarray(x, self.dtype)
