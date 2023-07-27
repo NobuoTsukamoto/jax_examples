@@ -22,42 +22,35 @@ ModuleDef = Any
         MobileNetV2: Inverted Residuals and Linear Bottlenecks
         https://arxiv.org/abs/1801.04381
 
-        https://github.com/keras-team/keras-applications/blob/06fbeb0f16e1304f239b2296578d1c50b15a983a/keras_applications/mobilenet_v2.py#L425
+        https://github.com/keras-team/keras-applications/blob/06fbeb0f16e1304f239b2296578d1c50b15a983a/keras_applications/mobilenet_v2.py
 """
 
 
-class MobileNetV2(nn.Module):
-    """MobileNet V2."""
+class MobileNetV2Backbone(nn.Module):
+    """MobileNet V2 backbone."""
 
     alpha: float
     num_classes: int
-    dtype: Any = jnp.float32
+    conv: ModuleDef = nn.Conv
+    norm: ModuleDef = nn.BatchNorm
     act: Callable = nn.relu
 
     @nn.compact
-    def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
-        norm = partial(
-            nn.BatchNorm,
-            use_running_average=not train,
-            momentum=0.9,
-            epsilon=1e-5,
-            dtype=self.dtype,
-        )
+    def __call__(self, x):
         inverted_res_block = partial(
-            InvertedResBlock, conv=conv, norm=norm, act=self.act
+            InvertedResBlock, conv=self.conv, norm=self.norm, act=self.act
         )
 
         first_block_filters = _make_divisible(32 * self.alpha, 8)
 
-        x = conv(
+        x = self.conv(
             first_block_filters,
             kernel_size=(3, 3),
             strides=(2, 2),
             padding=[(3, 3), (3, 3)],
             name="conv_init",
         )(x)
-        x = norm()(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         x = inverted_res_block(
@@ -122,9 +115,41 @@ class MobileNetV2(nn.Module):
         else:
             last_block_filters = 1280
 
-        x = conv(last_block_filters, kernel_size=(1, 1), name="conv_1")(x)
-        x = norm(name="conv_1_bn")(x)
+        x = self.conv(last_block_filters, kernel_size=(1, 1), name="conv_1")(x)
+        x = self.norm(name="conv_1_bn")(x)
         x = self.act(x)
+
+        return x
+
+
+class MobileNetV2(nn.Module):
+    """MobileNet V2."""
+
+    alpha: float
+    num_classes: int
+    dtype: Any = jnp.float32
+    act: Callable = nn.relu
+
+    @nn.compact
+    def __call__(self, x, train: bool = True):
+        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        norm = partial(
+            nn.BatchNorm,
+            use_running_average=not train,
+            momentum=0.9,
+            epsilon=1e-5,
+            dtype=self.dtype,
+        )
+        backbone = partial(
+            MobileNetV2Backbone,
+            alpha=self.alpha,
+            num_class=self.num_classes,
+            conv=conv,
+            norm=norm,
+            act=self.act,
+        )
+
+        x = backbone()(x)
 
         x = jnp.mean(x, axis=(1, 2))
         x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
