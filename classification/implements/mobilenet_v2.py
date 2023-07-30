@@ -30,7 +30,6 @@ class MobileNetV2Backbone(nn.Module):
     """MobileNet V2 backbone."""
 
     alpha: float
-    num_classes: int
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
     act: Callable = nn.relu
@@ -143,7 +142,6 @@ class MobileNetV2(nn.Module):
         backbone = partial(
             MobileNetV2Backbone,
             alpha=self.alpha,
-            num_class=self.num_classes,
             conv=conv,
             norm=norm,
             act=self.act,

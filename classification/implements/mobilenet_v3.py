@@ -28,39 +28,32 @@ ModuleDef = Any
 """
 
 
-class MobileNetV3(nn.Module):
-    """MobileNet V3."""
+class MobileNetV3Backbone(nn.Module):
+    """MobileNet V3 Backbone."""
 
     alpha: float
-    num_classes: int
     layers: Dict
-    last_block_filters: int
     dtype: Any = jnp.float32
     relu: Callable = nn.relu
     h_swish: Callable = jnn.hard_swish
     conv: ModuleDef = nn.Conv
+    norm: ModuleDef = nn.BatchNorm
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(self.conv, use_bias=False, dtype=self.dtype)
-        norm = partial(
-            nn.BatchNorm,
-            use_running_average=not train,
-            momentum=0.9,
-            epsilon=1e-5,
-            dtype=self.dtype,
+        inverted_res_block = partial(
+            InvertedResBlockMobileNetV3, conv=self.conv, norm=self.norm
         )
-        inverted_res_block = partial(InvertedResBlockMobileNetV3, conv=conv, norm=norm)
 
         first_block_filters = _make_divisible(16 * self.alpha, 8)
 
-        x = conv(
+        x = self.conv(
             first_block_filters,
             kernel_size=(3, 3),
             strides=(2, 2),
             name="conv_init",
         )(x)
-        x = norm()(x)
+        x = self.norm()(x)
         x = self.h_swish(x)
 
         for block_id, layer in self.layers.items():
@@ -79,9 +72,42 @@ class MobileNetV3(nn.Module):
         else:
             filters = _make_divisible(x.shape[-1] * 6, 8)
 
-        x = conv(filters, kernel_size=(1, 1), name="conv_1")(x)
-        x = norm()(x)
+        x = self.conv(filters, kernel_size=(1, 1), name="conv_1")(x)
+        x = self.norm()(x)
         x = self.h_swish(x)
+
+        return jnp.asarray(x, self.dtype)
+
+
+class MobileNetV3(nn.Module):
+    """MobileNet V3."""
+
+    alpha: float
+    num_classes: int
+    layers: Dict
+    last_block_filters: int
+    dtype: Any = jnp.float32
+
+    @nn.compact
+    def __call__(self, x, train: bool = True):
+        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        norm = partial(
+            nn.BatchNorm,
+            use_running_average=not train,
+            momentum=0.9,
+            epsilon=1e-5,
+            dtype=self.dtype,
+        )
+        backbone = partial(
+            MobileNetV3Backbone,
+            alpha=self.alpha,
+            layers=self.layers,
+            dtype=self.dtype,
+            conv=conv,
+            norm=norm,
+        )
+
+        x = backbone()(x)
 
         x = jnp.mean(x, axis=(1, 2), keepdims=True)
 
