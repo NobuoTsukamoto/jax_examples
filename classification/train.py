@@ -9,8 +9,8 @@
 import functools
 import time
 from typing import Any
-
 import input_pipeline
+from input_pipeline import ClassificationArgument
 import jax
 import jax.numpy as jnp
 import ml_collections
@@ -276,19 +276,20 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
 
     dataset_builder = tfds.builder(config.dataset)
     dataset_builder.download_and_prepare()
+
+    argument = ClassificationArgument(config=config, dtype=input_dtype)
+
     train_iter = create_input_iter(
         dataset_builder,
+        argument,
         local_batch_size,
-        config.image_size,
-        input_dtype,
         train=True,
         cache=config.cache,
     )
     eval_iter = create_input_iter(
         dataset_builder,
+        argument,
         local_batch_size,
-        config.image_size,
-        input_dtype,
         train=False,
         cache=config.cache,
     )

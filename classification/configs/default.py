@@ -16,7 +16,7 @@ def get_config():
 
     # As defined in the `models` module.
     config.model = "MobileNetV3_Large"
-    config.image_size = 224
+    config.image_size = (224, 224)
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "imagenette/full-size-v2:1.*.*"
@@ -31,6 +31,42 @@ def get_config():
 
     config.cache = False
     config.half_precision = False
+
+    # Input and augmentation
+    config.output_size = (224, 224)
+    config.aug_rand_horizontal_flip = True
+    config.aug_type = "randaug"     # randaug, autoaug, None
+
+    # autoaug
+    config.autoaug_augmentation_name = "v0"
+    config.autoaug_cutout_const = 100.
+    config.autoaug_translate_const = 250.
+
+    # randomarug
+    config.randaug_num_layers = 2
+    config.randaug_magnitude = 10.
+    config.randaug_cutout_const = 40.
+    config.randaug_translate_const = 0.
+    config.randaug_prob_to_apply = None
+    config.randaug_exclude_ops = ["Cutout"]
+
+    config.color_jitter = 0.
+
+    # random erasing
+    config.random_erasing = True
+    config.random_erasing.probability = 0.25
+    config.random_erasing_min_area = 0.02
+    config.random_erasing_max_area = 1 / 3
+    config.random_erasing_min_aspect = 0.3
+    config.random_erasing_max_aspect = None
+    config.random_erasing_min_count = 1
+    config.random_erasing_max_count = 1
+    config.random_erasing_trials = 10
+
+    config.crop_area_range = (0.08, 1.0)
+    config.center_crop_fraction = 0.875
+
+    config.three_augment = False
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
