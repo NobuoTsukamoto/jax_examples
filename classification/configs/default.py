@@ -53,7 +53,7 @@ def get_config():
 
     # random erasing
     config.random_erasing = True
-    config.random_erasing.probability = 0.25
+    config.random_erasing_probability = 0.25
     config.random_erasing_min_area = 0.02
     config.random_erasing_max_area = 1 / 3
     config.random_erasing_min_aspect = 0.3

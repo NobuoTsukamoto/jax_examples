@@ -56,7 +56,7 @@ class ClassificationArgument:
 
         if config.random_erasing:
             self._random_erasing = tfm.vision.augment.RandomErasing(
-                probability=config.random_erasing.probability,
+                probability=config.random_erasing_probability,
                 min_area=config.random_erasing_min_area,
                 max_area=config.random_erasing_max_area,
                 min_aspect=config.random_erasing_min_aspect,

@@ -46,7 +46,7 @@ def create_model(*, model_cls, half_precision, num_classes, **kwargs):
 
 
 def initialized(key, image_size, model):
-    input_shape = (1, image_size, image_size, 3)
+    input_shape = (1, image_size[0], image_size[1], 3)
 
     @jax.jit
     def init(*args):
@@ -170,12 +170,11 @@ def prepare_tf_data(xs):
     return jax.tree_util.tree_map(_prepare, xs)
 
 
-def create_input_iter(dataset_builder, batch_size, image_size, dtype, train, cache):
+def create_input_iter(dataset_builder, augment, batch_size, train, cache):
     ds = input_pipeline.create_split(
         dataset_builder,
+        augment,
         batch_size,
-        image_size=image_size,
-        dtype=dtype,
         train=train,
         cache=cache,
     )
