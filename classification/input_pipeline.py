@@ -149,9 +149,10 @@ class ClassificationArgument:
 
 def create_split(
     dataset_builder,
-    argument, 
+    argument,
     batch_size,
     train,
+    postprocess_fn=None,
     cache=False,
 ):
     """Creates a split from the ImageNet dataset using TensorFlow Datasets.
@@ -179,8 +180,16 @@ def create_split(
     def decode_example(example):
         if train:
             image = argument.parse_train_image(example["image"])
+
         else:
             image = argument.parse_eval_image(example["image"])
+
+        return {"image": image, "label": example["label"]}
+
+
+    def postprocess(example):
+        print(example["image"].shape)
+        image, label = postprocess_fn.distort(example["image"], example["label"])
         return {"image": image, "label": example["label"]}
 
     ds = dataset_builder.as_dataset(
@@ -202,9 +211,12 @@ def create_split(
 
     ds = ds.map(decode_example, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     ds = ds.batch(batch_size, drop_remainder=True)
+    if train and postprocess_fn is not None:
+        ds = ds.map(postprocess, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if not train:
         ds = ds.repeat()
+
 
     ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 

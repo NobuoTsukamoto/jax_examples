@@ -33,6 +33,7 @@ from implements.ff_net import (
     ResNet74NS,
     ResNet46NS,
 )
+from implements.dab_net import DABNet
 from implements.common_layer import ResNetBlock, BottleneckResNetBlock
 
 # FastSCNN
@@ -105,3 +106,6 @@ FFNet_ResNet46NS_CCC = partial(
     seg_head_features=Seg_C,
     mode="Mobile",
 )
+
+# DAB Net
+DAB_Net = partial(DABNet)

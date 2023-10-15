@@ -21,13 +21,14 @@ def get_config():
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "imagenette/full-size-v2:1.*.*"
 
-    config.learning_rate = 0.1
+    config.optimizer = "adamw"
+    config.learning_rate = 0.001
     config.warmup_epochs = 5.0
     config.momentum = 0.9
     config.batch_size = 64
 
-    config.num_epochs = 100.0
-    config.log_every_steps = 100
+    config.num_epochs = 300.0
+    config.log_every_steps = 147
 
     config.cache = False
     config.half_precision = False
@@ -61,6 +62,13 @@ def get_config():
     config.random_erasing_min_count = 1
     config.random_erasing_max_count = 1
     config.random_erasing_trials = 10
+
+    config.mixup_and_cutmix = True
+    config.mixup_and_cutmix_mixup_alpha = 0.8
+    config.mixup_and_cutmix_cutmix_alpha = 1.0
+    config.mixup_and_cutmix_prob = 1.0
+    config.mixup_and_cutmix_switch_prob = 0.5
+    config.mixup_and_cutmix_label_smoothing = 0.1
 
     config.crop_area_range = (0.08, 1.0)
     config.center_crop_fraction = 0.875
