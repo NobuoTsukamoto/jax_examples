@@ -340,8 +340,10 @@ def create_train_state(
         dynamic_scale = None
 
     params, batch_stats = initialized(rngs, image_size, model)
-    if config.optimizer == "adam":
-        tx = optax.sgd(learning_rate=config.learning_rate)
+    if config.optimizer == "adamw":
+        tx = optax.adamw(
+            learning_rate=learning_rate_fn,
+        )
 
     elif config.optimizer == "sgd":
         tx = optax.sgd(

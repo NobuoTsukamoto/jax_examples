@@ -186,11 +186,11 @@ def create_split(
 
         return {"image": image, "label": example["label"]}
 
-
     def postprocess(example):
-        print(example["image"].shape)
+        print(example["label"].shape)
         image, label = postprocess_fn.distort(example["image"], example["label"])
-        return {"image": image, "label": example["label"]}
+        print(label.shape)
+        return {"image": image, "label": label}
 
     ds = dataset_builder.as_dataset(
         split=split,
@@ -216,7 +216,6 @@ def create_split(
 
     if not train:
         ds = ds.repeat()
-
 
     ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 

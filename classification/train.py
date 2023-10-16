@@ -58,14 +58,16 @@ def initialized(key, image_size, model):
 
 
 def cross_entropy_loss(logits, labels, num_classes):
-    one_hot_labels = common_utils.onehot(labels, num_classes=num_classes)
+    # one_hot_labels = common_utils.onehot(labels, num_classes=num_classes)
+    one_hot_labels = labels
+    print(logits.shape, one_hot_labels.shape)
     xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
     return jnp.mean(xentropy)
 
 
 def compute_metrics(logits, labels, num_classes):
     loss = cross_entropy_loss(logits, labels, num_classes)
-    accuracy = jnp.mean(jnp.argmax(logits, -1) == labels)
+    accuracy = jnp.mean(jnp.argmax(logits, -1) == jnp.argmax(labels, -1))
     metrics = {
         "loss": loss,
         "accuracy": accuracy,
