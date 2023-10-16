@@ -17,6 +17,7 @@ import ml_collections
 import optax
 import tensorflow as tf
 import tensorflow_datasets as tfds
+
 from absl import logging
 from clu import metric_writers, periodic_actions
 from flax import jax_utils
@@ -443,14 +444,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         output_size=output_size,
     )
 
-    if config.optimizer == "sgd":
-        base_learning_rate = config.learning_rate
-        # base_learning_rate = config.learning_rate * config.batch_size / 256.0
-        learning_rate_fn = create_learning_rate_fn(
-            config, base_learning_rate, steps_per_epoch
-        )
-    else:
-        learning_rate_fn = None
+    base_learning_rate = config.learning_rate
+    learning_rate_fn = create_learning_rate_fn(
+        config, base_learning_rate, steps_per_epoch
+    )
 
     state = create_train_state(rngs, config, model, config.image_size, learning_rate_fn)
     state = restore_checkpoint(state, workdir)

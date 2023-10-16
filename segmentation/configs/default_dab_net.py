@@ -23,8 +23,8 @@ def get_config():
     config.model_input = (512, 1024)
 
     # Training param
-    config.optimizer = "sgd"
-    config.learning_rate = 0.0045
+    config.optimizer = "adamw"
+    config.learning_rate = 0.045
     config.warmup_epochs = 10.0
     config.momentum = 0.9
     config.batch_size = 8
