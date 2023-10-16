@@ -9,8 +9,8 @@
 import functools
 import time
 from typing import Any
-
 import input_pipeline
+from input_pipeline import ClassificationArgument
 import jax
 import jax.numpy as jnp
 import ml_collections
@@ -25,6 +25,7 @@ from flax.training import checkpoints, common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
 from flax.training import train_state
 from jax import lax, random
+import tensorflow_models as tfm
 
 """ Training Image classfication model.
 
@@ -46,7 +47,7 @@ def create_model(*, model_cls, half_precision, num_classes, **kwargs):
 
 
 def initialized(key, image_size, model):
-    input_shape = (1, image_size, image_size, 3)
+    input_shape = (1, image_size[0], image_size[1], 3)
 
     @jax.jit
     def init(*args):
@@ -138,12 +139,13 @@ def train_step(state, batch, learning_rate_fn, num_classes):
             opt_state=jax.tree_util.tree_map(
                 functools.partial(jnp.where, is_fin),
                 new_state.opt_state,
-                state.opt_state),
+                state.opt_state,
+            ),
             params=jax.tree_util.tree_map(
-                functools.partial(jnp.where, is_fin),
-                new_state.params,
-                state.params),
-            dynamic_scale=dynamic_scale)
+                functools.partial(jnp.where, is_fin), new_state.params, state.params
+            ),
+            dynamic_scale=dynamic_scale,
+        )
         metrics["scale"] = dynamic_scale.scale
 
     return new_state, metrics
@@ -170,13 +172,15 @@ def prepare_tf_data(xs):
     return jax.tree_util.tree_map(_prepare, xs)
 
 
-def create_input_iter(dataset_builder, batch_size, image_size, dtype, train, cache):
+def create_input_iter(
+    dataset_builder, augment, batch_size, train, postprocess_fn, cache
+):
     ds = input_pipeline.create_split(
         dataset_builder,
+        augment,
         batch_size,
-        image_size=image_size,
-        dtype=dtype,
         train=train,
+        postprocess_fn=postprocess_fn,
         cache=cache,
     )
     it = map(prepare_tf_data, ds)
@@ -238,11 +242,26 @@ def create_train_state(
         dynamic_scale = None
 
     params, batch_stats = initialized(rng, image_size, model)
-    tx = optax.sgd(
-        learning_rate=learning_rate_fn,
-        momentum=config.momentum,
-        nesterov=True,
-    )
+
+    if config.optimizer == "sgd":
+        tx = optax.sgd(
+            learning_rate=learning_rate_fn,
+            momentum=config.momentum,
+            nesterov=True,
+        )
+    elif config.optimizer == "adam":
+        tx = optax.adam(
+            learning_rate=learning_rate_fn,
+        )
+    elif config.optimizer == "adamw":
+        tx = optax.adamw(
+            learning_rate=learning_rate_fn,
+            b1=0.9,
+            b2=0.98,
+            eps=1e-9,
+            weight_decay=1e-1,
+        )
+
     state = TrainState.create(
         apply_fn=model.apply,
         params=params,
@@ -276,23 +295,36 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
 
     dataset_builder = tfds.builder(config.dataset)
     dataset_builder.download_and_prepare()
+    num_classes = dataset_builder.info.features["label"].num_classes
+
+    argument = ClassificationArgument(config=config, dtype=input_dtype)
+    postprocess_fn = None
+    if config.mixup_and_cutmix:
+        postprocess_fn = tfm.vision.augment.MixupAndCutmix(
+            mixup_alpha=config.mixup_and_cutmix_mixup_alpha,
+            cutmix_alpha=config.mixup_and_cutmix_cutmix_alpha,
+            prob=config.mixup_and_cutmix_prob,
+            switch_prob=config.mixup_and_cutmix_switch_prob,
+            label_smoothing=config.mixup_and_cutmix_label_smoothing,
+            num_classes=num_classes,
+        )
+
     train_iter = create_input_iter(
         dataset_builder,
+        argument,
         local_batch_size,
-        config.image_size,
-        input_dtype,
         train=True,
+        postprocess_fn=postprocess_fn,
         cache=config.cache,
     )
     eval_iter = create_input_iter(
         dataset_builder,
+        argument,
         local_batch_size,
-        config.image_size,
-        input_dtype,
         train=False,
+        postprocess_fn=None,
         cache=config.cache,
     )
-    num_classes = dataset_builder.info.features["label"].num_classes
 
     steps_per_epoch = (
         dataset_builder.info.splits["train"].num_examples // config.batch_size
@@ -309,8 +341,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
     else:
         steps_per_eval = config.steps_per_eval
 
-    steps_per_checkpoint = steps_per_epoch
+    steps_per_checkpoint = steps_per_epoch * 10
     base_learning_rate = config.learning_rate * config.batch_size / 256.0
+
     model_cls = getattr(models, config.model)
     model = create_model(
         model_cls=model_cls,
@@ -332,7 +365,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         functools.partial(
             train_step, learning_rate_fn=learning_rate_fn, num_classes=num_classes
         ),
-        axis_name="batch"
+        axis_name="batch",
     )
     p_eval_step = jax.pmap(
         functools.partial(eval_step, num_classes=num_classes), axis_name="batch"
@@ -358,7 +391,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
                 train_metrics = common_utils.get_metrics(train_metrics)
                 summary = {
                     f"train_{k}": v
-                    for k, v in jax.tree_util.tree_map(lambda x: x.mean(), train_metrics).items()
+                    for k, v in jax.tree_util.tree_map(
+                        lambda x: x.mean(), train_metrics
+                    ).items()
                 }
                 summary["steps_per_second"] = config.log_every_steps / (
                     time.time() - train_metrics_last_t

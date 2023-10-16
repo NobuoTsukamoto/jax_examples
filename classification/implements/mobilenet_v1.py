@@ -13,7 +13,7 @@ from typing import Any, Callable
 import jax.numpy as jnp
 from flax import linen as nn
 
-from common_layer import DepthwiseSeparable
+from .common_layer import DepthwiseSeparable
 
 ModuleDef = Any
 
