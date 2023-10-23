@@ -11,6 +11,7 @@ import math
 import numpy as np
 import jax
 import tensorflow as tf
+import tensorflow_models as tfm
 import tensorflow_datasets as tfds
 
 """ Input Pipline
@@ -49,20 +50,17 @@ def _prepare_image_and_label(datapoint, input_image_size):
     image = tf.io.decode_image(datapoint["image_left"], 3, dtype=tf.uint8)
     image = tf.reshape(image, (input_image_size[0], input_image_size[1], 3))
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-    image = _normalize_image(image)
+    image = tfm.vision.preprocess_ops.normalize_image(
+        image,
+        [mean / 255.0 for mean in MEAN_RGB],
+        [stddev / 255.0 for stddev in STDDEV_RGB],
+    )
 
     label = tf.cast(label, dtype=tf.int32)
     label = tf.where(label >= 34, 34, label)
     label = tf.cast(tf.gather(LABEL_ID, tf.cast(label, dtype=tf.int32)), dtype=tf.uint8)
     label = tf.cast(label, tf.float32)
 
-    return image, label
-
-
-def _random_horizontal_flip(image, label, seed=42, prob=0.5):
-    do_flip = tf.less(tf.random.uniform([], seed=seed), prob)
-    image = tf.cond(do_flip, lambda: tf.image.flip_left_right(image), lambda: image)
-    label = tf.cond(do_flip, lambda: label[:, :, ::-1], lambda: label)
     return image, label
 
 
@@ -196,16 +194,12 @@ def parse_train_data(
         label = tf.reshape(image_mask_crop[:, :, -1], [1] + crop_size)
 
     # Flips image randomly during training.
-    image, label = _random_horizontal_flip(image, label)
+    image, _, label = tfm.vision.preprocess_ops.random_horizontal_flip(image, masks=label)
 
     train_image_size = crop_size if crop_size else output_image_size
     # Resizes and crops image.
-    image, image_info = _resize_and_crop_image(
-        image,
-        train_image_size,
-        train_image_size,
-        aug_scale_min=aug_scale_min,
-        aug_scale_max=aug_scale_max,
+    image, image_info = tfm.vision.preprocess_ops.resize_and_crop_image(
+        image, train_image_size, train_image_size, aug_scale_min, aug_scale_max
     )
 
     # Resizes and crops boxes.
@@ -216,7 +210,9 @@ def parse_train_data(
     # The label is first offset by +1 and then padded with 0.
     label += 1
     label = tf.expand_dims(label, axis=3)
-    label = _resize_and_crop_masks(label, image_scale, train_image_size, offset)
+    label = tfm.vision.preprocess_ops.resize_and_crop_masks(
+        label, image_scale, train_image_size, offset
+    )
 
     label -= 1
     label = tf.where(tf.equal(label, -1), ignore_label * tf.ones_like(label), label)
@@ -244,7 +240,7 @@ def parse_eval_data(
     label = tf.expand_dims(label, axis=3)
 
     # Resizes and crops image.
-    image, image_info = _resize_and_crop_image(
+    image, image_info = tfm.vision.preprocess_ops.resize_and_crop_image(
         image, output_image_size, output_image_size
     )
 
@@ -252,7 +248,9 @@ def parse_eval_data(
     # is computed on output_size not the original size of the images.
     image_scale = image_info[2, :]
     offset = image_info[3, :]
-    label = _resize_and_crop_masks(label, image_scale, output_image_size, offset)
+    label = tfm.vision.preprocess_ops.resize_and_crop_masks(
+        label, image_scale, output_image_size, offset
+    )
 
     label -= 1
     label = tf.where(tf.equal(label, -1), ignore_label * tf.ones_like(label), label)

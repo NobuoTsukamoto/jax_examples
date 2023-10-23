@@ -13,7 +13,7 @@ jax.config.update("jax_disable_most_optimizations", True)
 class DABNetTest(parameterized.TestCase):
     """Test cases for DABNet model definition."""
 
-    def test_fast_scnn_model(self):
+    def test_dab_net_model(self):
         """Tests DABNet model definition and output (variables)."""
         rngs = {
             "params": jax.random.PRNGKey(0),

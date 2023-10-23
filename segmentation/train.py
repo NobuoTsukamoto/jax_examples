@@ -173,8 +173,8 @@ def train_step(
                 logits["aux_loss"], batch["label"], num_classes, ignore_label
             )
         weight_decay = 0.00004
-        # weight_penalty_params = jax.tree_util.tree_leaves(params)
-        # weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
+        weight_penalty_params = jax.tree_util.tree_leaves(params)
+        weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
         weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
         weight_l2 = sum(
             jnp.sum(x[1] ** 2)

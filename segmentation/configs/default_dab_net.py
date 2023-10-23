@@ -15,7 +15,7 @@ def get_config():
     config = ml_collections.ConfigDict()
 
     # As defined in the `models` module.
-    config.model = "Fast_SCNN"
+    config.model = "DAB_Net"
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
@@ -23,9 +23,9 @@ def get_config():
     config.model_input = (512, 1024)
 
     # Training param
-    config.optimizer = "adamw"
+    config.optimizer = "sgd"
     config.learning_rate = 0.045
-    config.warmup_epochs = 10.0
+    config.warmup_epochs = 5.0
     config.momentum = 0.9
     config.batch_size = 8
 
@@ -46,8 +46,8 @@ def get_config():
 
     # Data augmentation
     config.image_size = (1024, 2048)
-    config.min_resize_value = 0.25
-    config.max_resize_value = 1.0
+    config.min_resize_value = 0.5
+    config.max_resize_value = 2.0
     config.crop_image_size = (512, 1024)
     config.output_image_size = (512, 1024)
 
