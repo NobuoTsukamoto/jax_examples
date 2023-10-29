@@ -52,8 +52,8 @@ def _prepare_image_and_label(datapoint, input_image_size):
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     image = tfm.vision.preprocess_ops.normalize_image(
         image,
-        [mean / 255.0 for mean in MEAN_RGB],
-        [stddev / 255.0 for stddev in STDDEV_RGB],
+        tfm.vision.preprocess_ops.MEAN_RGB,
+        tfm.vision.preprocess_ops.STDDEV_RGB
     )
 
     label = tf.cast(label, dtype=tf.int32)
@@ -194,7 +194,9 @@ def parse_train_data(
         label = tf.reshape(image_mask_crop[:, :, -1], [1] + crop_size)
 
     # Flips image randomly during training.
-    image, _, label = tfm.vision.preprocess_ops.random_horizontal_flip(image, masks=label)
+    image, _, label = tfm.vision.preprocess_ops.random_horizontal_flip(
+        image, masks=label
+    )
 
     train_image_size = crop_size if crop_size else output_image_size
     # Resizes and crops image.
