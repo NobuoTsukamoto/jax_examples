@@ -60,7 +60,8 @@ def ohem_cross_entropy_loss(
     class_weights=None,
     epsilon=1e-5,
 ):
-    class_weights = class_weights if class_weights else [1] * num_classes
+    if class_weights is None:
+        class_weights = jnp.ones(num_classes, dtype=jnp.float32)
 
     batch, height, width, channel = logits.shape
     updated_labels = jnp.ravel(labels).astype(jnp.int32)
@@ -76,26 +77,43 @@ def ohem_cross_entropy_loss(
     prob = prob.transpose((3, 0, 1, 2))
     prob = prob.reshape((channel, -1))
 
-    if min_kept < num_valid and num_valid > 0:
-        # let the value which ignored greater than 1
-        prob = prob + (1 - valid_mask)
+    # let the value which ignored greater than 1
+    prob = prob + (1 - valid_mask)
 
-        # get the prob of relevant label
-        one_hot_labels = jax.nn.one_hot(updated_labels, num_classes=num_classes)
-        one_hot_labels = one_hot_labels.transpose((1, 0))
-        prob = prob * one_hot_labels
-        prob = jnp.sum(prob, axis=0)
+    # get the prob of relevant label
+    one_hot_labels = jax.nn.one_hot(updated_labels, num_classes=num_classes)
+    one_hot_labels = one_hot_labels.transpose((1, 0))
+    prob = prob * one_hot_labels
+    prob = jnp.sum(prob, axis=0)
 
-        if min_kept > 0:
-            index = jnp.argsort(prob)
-            threshold_index = index[min(len(index), min_kept) - 1]
-            threshold_index = threshold_index.astype(jnp.int32)
-            if prob[threshold_index] > threshold:
-                threshold = prob[threshold_index]
+    if min_kept > 0:
+        index = jnp.argsort(prob)
+        threshold_index = index[min(len(index), min_kept) - 1]
+        threshold_index = threshold_index.astype(jnp.int32)
+        threshold = jax.lax.cond(
+            prob[threshold_index] > threshold,
+            lambda _: prob[threshold_index],
+            lambda _: threshold,
+            None,
+        )
 
-            kept_mask = (prob < threshold).astype(jnp.int32)
-            updated_labels = updated_labels * kept_mask
-            valid_mask = valid_mask * kept_mask
+        kept_mask = (prob < threshold).astype(jnp.int32)
+
+        def apply_ohem_loss_true_fun(_):
+            new_updated_labels = updated_labels * kept_mask
+            new_valid_mask = valid_mask * kept_mask
+            return new_updated_labels, new_valid_mask
+
+        def apply_ohem_loss_false_fun(_):
+            return updated_labels, valid_mask.astype(jnp.int32)
+
+        is_apply_ohem_loss = (min_kept < num_valid) & (num_valid > 0)
+        updated_labels, valid_mask = jax.lax.cond(
+            is_apply_ohem_loss,
+            apply_ohem_loss_true_fun,
+            apply_ohem_loss_false_fun,
+            None,
+        )
 
     # make the invalid region as ignore
     updated_labels = updated_labels + (1 - valid_mask) * ignore_label

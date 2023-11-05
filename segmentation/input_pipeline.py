@@ -37,12 +37,6 @@ LABEL_ID = np.asarray([255, 255, 255, 255, 255, 255,
 # fmt: on
 
 
-def _normalize_image(image):
-    image -= tf.constant(MEAN_RGB, shape=[1, 1, 3], dtype=image.dtype)
-    image /= tf.constant(STDDEV_RGB, shape=[1, 1, 3], dtype=image.dtype)
-    return image
-
-
 def _prepare_image_and_label(datapoint, input_image_size):
     label = tf.io.decode_image(datapoint["segmentation_label"], channels=1)
     label = tf.reshape(label, (1, input_image_size[0], input_image_size[1]))
@@ -51,9 +45,7 @@ def _prepare_image_and_label(datapoint, input_image_size):
     image = tf.reshape(image, (input_image_size[0], input_image_size[1], 3))
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     image = tfm.vision.preprocess_ops.normalize_image(
-        image,
-        tfm.vision.preprocess_ops.MEAN_RGB,
-        tfm.vision.preprocess_ops.STDDEV_RGB
+        image, MEAN_RGB, STDDEV_RGB
     )
 
     label = tf.cast(label, dtype=tf.int32)
@@ -62,108 +54,6 @@ def _prepare_image_and_label(datapoint, input_image_size):
     label = tf.cast(label, tf.float32)
 
     return image, label
-
-
-def _resize_and_crop_image(
-    image,
-    desired_size,
-    padded_size,
-    aug_scale_min=1.0,
-    aug_scale_max=1.0,
-    seed=42,
-    method=tf.image.ResizeMethod.BILINEAR,
-):
-    image_size = tf.cast(tf.shape(image)[0:2], tf.float32)
-    random_jittering = not math.isclose(aug_scale_min, 1.0) or not math.isclose(
-        aug_scale_max, 1.0
-    )
-
-    if random_jittering:
-        random_scale = tf.random.uniform([], aug_scale_min, aug_scale_max, seed=seed)
-        scaled_size = tf.round(random_scale * tf.cast(desired_size, tf.float32))
-    else:
-        scaled_size = tf.cast(desired_size, tf.float32)
-
-    scale = tf.minimum(scaled_size[0] / image_size[0], scaled_size[1] / image_size[1])
-    scaled_size = tf.round(image_size * scale)
-
-    # Computes 2D image_scale.
-    image_scale = scaled_size / image_size
-
-    # Selects non-zero random offset (x, y) if scaled image is larger than
-    # desired_size.
-    if random_jittering:
-        max_offset = scaled_size - tf.cast(desired_size, tf.float32)
-        max_offset = tf.where(
-            tf.less(max_offset, 0), tf.zeros_like(max_offset), max_offset
-        )
-        offset = max_offset * tf.random.uniform(
-            [
-                2,
-            ],
-            0,
-            1,
-            seed=seed,
-        )
-        offset = tf.cast(offset, tf.int32)
-    else:
-        offset = tf.zeros((2,), tf.int32)
-
-    scaled_image = tf.image.resize(image, tf.cast(scaled_size, tf.int32), method=method)
-
-    if random_jittering:
-        scaled_image = scaled_image[
-            offset[0] : offset[0] + desired_size[0],
-            offset[1] : offset[1] + desired_size[1],
-            :,
-        ]
-
-    output_image = scaled_image
-    if padded_size is not None:
-        output_image = tf.image.pad_to_bounding_box(
-            scaled_image, 0, 0, padded_size[0], padded_size[1]
-        )
-
-    image_info = tf.stack(
-        [
-            image_size,
-            tf.cast(desired_size, dtype=tf.float32),
-            image_scale,
-            tf.cast(offset, tf.float32),
-        ]
-    )
-    return output_image, image_info
-
-
-def _resize_and_crop_masks(masks, image_scale, output_size, offset):
-    mask_size = tf.cast(tf.shape(masks)[1:3], tf.float32)
-    num_channels = tf.shape(masks)[3]
-    # Pad masks to avoid empty mask annotations.
-    masks = tf.concat(
-        [
-            tf.zeros([1, mask_size[0], mask_size[1], num_channels], dtype=masks.dtype),
-            masks,
-        ],
-        axis=0,
-    )
-    scaled_size = tf.cast(image_scale * mask_size, tf.int32)
-    scaled_masks = tf.image.resize(
-        masks, scaled_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
-    )
-    offset = tf.cast(offset, tf.int32)
-    scaled_masks = scaled_masks[
-        :,
-        offset[0] : offset[0] + output_size[0],
-        offset[1] : offset[1] + output_size[1],
-        :,
-    ]
-
-    output_masks = tf.image.pad_to_bounding_box(
-        scaled_masks, 0, 0, output_size[0], output_size[1]
-    )
-    # Remove padding.
-    output_masks = output_masks[1::]
-    return output_masks
 
 
 def parse_train_data(
