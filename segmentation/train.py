@@ -22,13 +22,13 @@ from absl import logging
 from clu import metric_writers, periodic_actions
 from flax import jax_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
-from flax.training import checkpoints, train_state
+from flax.training import checkpoints, common_utils, train_state
 from jax import lax
 
 import input_pipeline
 import models
 from miou_metrics import eval_semantic_segmentation
-from loss import cross_entropy_loss
+from loss import cross_entropy_loss, ohem_cross_entropy_loss
 
 
 def create_model(*, model_cls, half_precision, num_classes, output_size, **kwargs):
@@ -122,12 +122,16 @@ def train_step(
             rngs={"dropout": dropout_rng},
         )
         loss = cross_entropy_loss(
-            logits["output"], batch["label"], num_classes, ignore_label
+            logits["output"], batch["label"], num_classes, ignore_label, class_weights
         )
         aux_loss = 0
         if "aux_loss" in logits:
             aux_loss = 0.4 * cross_entropy_loss(
-                logits["aux_loss"], batch["label"], num_classes, ignore_label
+                logits["aux_loss"],
+                batch["label"],
+                num_classes,
+                ignore_label,
+                class_weights,
             )
         weight_decay = 0.00004
         weight_penalty_params = jax.tree_util.tree_leaves(params)

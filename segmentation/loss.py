@@ -21,7 +21,12 @@ def cross_entropy_loss(
     label_smoothing=0.0,
     epsilon=1e-5,
 ):
-    class_weights = class_weights if class_weights else [1] * num_classes
+    """
+    Reference:
+        https://github.com/tensorflow/models/blob/c44482ab303f6a13b33048ca6058877c06a6a2d1/official/vision/losses/segmentation_losses.py#L36
+    """
+    if class_weights is None:
+        class_weights = jnp.ones(num_classes, dtype=jnp.float32)
 
     valid_mask = jnp.not_equal(labels, ignore_label)
     updated_labels = jnp.where(valid_mask, labels, -jnp.ones_like(labels))
@@ -60,6 +65,12 @@ def ohem_cross_entropy_loss(
     class_weights=None,
     epsilon=1e-5,
 ):
+    """
+    OHEM Loss
+
+    Reference:
+        https://arxiv.org/abs/1604.03540v1
+    """
     if class_weights is None:
         class_weights = jnp.ones(num_classes, dtype=jnp.float32)
 
@@ -118,7 +129,7 @@ def ohem_cross_entropy_loss(
     # make the invalid region as ignore
     updated_labels = updated_labels + (1 - valid_mask) * ignore_label
 
-    updated_labels = updated_labels.reshape((batch, height, width, 1))
+    updated_labels = updated_labels.reshape((batch, height, width))
     one_hot_labels = jnp.squeeze(
         jax.nn.one_hot(updated_labels, num_classes=num_classes), axis=3
     )
