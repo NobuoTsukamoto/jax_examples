@@ -45,6 +45,8 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 | Fully Convolutional Networks for Semantic Segmentation | https://arxiv.org/abs/1411.4038 |
 | Simple and Efficient Architectures for Semantic Segmentation | https://arxiv.org/abs/2206.08236 |
 | DABNet: Depth-wise Asymmetric Bottleneck for Real-time Semantic Segmentation | https://arxiv.org/abs/1907.11357 |
+| Training Region-based Object Detectors with Online Hard Example Mining | https://arxiv.org/abs/1604.03540 |
+| Striking the Right Balance: Recall Loss for Semantic Segmentation | https://arxiv.org/abs/2106.14917 |
 
 # Installation
 

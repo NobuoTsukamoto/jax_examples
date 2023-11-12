@@ -144,3 +144,64 @@ def ohem_cross_entropy_loss(
     loss = loss * weight_mask
     loss = loss * valid_mask
     return jnp.mean(loss) / (jnp.mean(valid_mask) + epsilon)
+
+
+def recall_cross_entory_loss(
+    logits, labels, num_classes, ignore_label=255, class_weights=None, epsilon=1e-5
+):
+    """
+    Recall Loss
+
+    Striking the Right Balance: Recall Loss for Semantic Segmentation
+
+    Reference:
+        https://arxiv.org/abs/2106.14917
+        https://github.com/PotatoTian/recall-semseg/blob/main/ptsemseg/loss/loss.py
+    """
+
+    if class_weights is None:
+        class_weights = jnp.ones(num_classes, dtype=jnp.float32)
+
+    valid_mask = jnp.not_equal(labels, ignore_label)
+    updated_labels = jnp.where(valid_mask, labels, -jnp.ones_like(labels))
+
+    # batch, height, width, class -> batch, height, width, 1
+    pred = jnp.argmax(logits, axis=-1, keepdims=True)
+
+    print(pred.shape, labels.shape)
+    index = (pred != labels).ravel()
+
+    # Calculate ground truth counts.
+    gt_counter = jnp.ones((num_classes,))
+    gt_index, gt_count = jnp.unique(logits, return_counts=True)
+
+    # Map ignored label to an exisiting one
+    gt_count = gt_count.at[gt_index == ignore_label].set(gt_count[1])
+    gt_index = gt_count.at[gt_index == ignore_label].set(1)
+    gt_counter = gt_count.at[gt_index].set(gt_count).astype(jnp.float32)
+
+    # calculate false negative counts
+    fn_counter = jnp.ones((num_classes))
+    fn = labels.ravel()[index]
+    fn_idx, fn_count = jnp.unique(fn, return_counts=True)
+
+    # map ignored label to an exisiting one
+    fn_count = fn_count.at[fn_idx == ignore_label].set(fn_count[1])
+    fn_idx = fn_idx.at[fn_idx == ignore_label].set(1)
+    fn_counter = fn_counter.at[fn_idx].set(fn_count).astype(jnp.float32)
+
+    if class_weights is not None:
+        class_weights = 0.5 * (fn_counter / gt_counter) + 0.5 * class_weights
+    else:
+        class_weights = fn_counter / gt_counter
+
+    one_hot_labels = jnp.squeeze(
+        jax.nn.one_hot(updated_labels, num_classes=num_classes), axis=3
+    )
+    cross_entropy_loss = optax.softmax_cross_entropy(
+        logits=logits, labels=one_hot_labels
+    )
+    loss = class_weights[labels] * cross_entropy_loss
+    num_valid_values = jnp.sum(valid_mask)
+
+    return jnp.sum(loss) / (num_valid_values + epsilon)
