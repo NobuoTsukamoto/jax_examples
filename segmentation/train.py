@@ -28,7 +28,7 @@ from jax import lax
 import input_pipeline
 import models
 from miou_metrics import eval_semantic_segmentation
-from loss import cross_entropy_loss, ohem_cross_entropy_loss
+from loss import cross_entropy_loss, ohem_cross_entropy_loss, recall_cross_entory_loss
 
 
 def create_model(*, model_cls, half_precision, num_classes, output_size, **kwargs):
@@ -66,7 +66,13 @@ def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
 
 
 def compute_metrics(logits, labels, num_classes, ignore_label, class_weights=None):
-    loss = cross_entropy_loss(logits, labels, num_classes, ignore_label, class_weights)
+    loss = recall_cross_entory_loss(
+        logits,
+        labels,
+        num_classes,
+        ignore_label=ignore_label,
+        class_weights=class_weights,
+    )
     segmentation_metrics = semantic_segmentation_metrics(
         logits, labels, num_classes, ignore_label
     )
@@ -121,21 +127,25 @@ def train_step(
             mutable=["batch_stats"],
             rngs={"dropout": dropout_rng},
         )
-        loss = cross_entropy_loss(
-            logits["output"], batch["label"], num_classes, ignore_label, class_weights
+        loss = recall_cross_entory_loss(
+            logits["output"],
+            batch["label"],
+            num_classes,
+            ignore_label=ignore_label,
+            class_weights=class_weights,
         )
         aux_loss = 0
         if "aux_loss" in logits:
-            aux_loss = 0.4 * cross_entropy_loss(
+            aux_loss = 0.4 * recall_cross_entory_loss(
                 logits["aux_loss"],
                 batch["label"],
                 num_classes,
-                ignore_label,
-                class_weights,
+                ignore_label=ignore_label,
+                class_weights=class_weights,
             )
         weight_decay = 0.00004
-        weight_penalty_params = jax.tree_util.tree_leaves(params)
-        weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
+        # weight_penalty_params = jax.tree_util.tree_leaves(params)
+        # weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
         weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
         weight_l2 = sum(
             jnp.sum(x[1] ** 2)
@@ -350,7 +360,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
     local_batch_size = config.batch_size // jax.process_count()
     input_dtype = get_input_dtype(config.half_precision)
 
-    dataset_builder = tfds.builder(config.dataset)
+    dataset_builder = tfds.builder(config.dataset, data_dir=config.dataset_dir)
     dataset_builder.download_and_prepare()
     train_iter = create_input_iter(
         dataset_builder,

@@ -7,6 +7,8 @@
     See the LICENSE file in the project root for more information.
 """
 
+from miou_metrics import _calc_semantic_segmentation_confusion
+
 import jax
 import jax.numpy as jnp
 import optax
@@ -159,36 +161,26 @@ def recall_cross_entory_loss(
         https://github.com/PotatoTian/recall-semseg/blob/main/ptsemseg/loss/loss.py
     """
 
-    if class_weights is None:
-        class_weights = jnp.ones(num_classes, dtype=jnp.float32)
-
     valid_mask = jnp.not_equal(labels, ignore_label)
     updated_labels = jnp.where(valid_mask, labels, -jnp.ones_like(labels))
 
     # batch, height, width, class -> batch, height, width, 1
     pred = jnp.argmax(logits, axis=-1, keepdims=True)
 
-    print(pred.shape, labels.shape)
-    index = (pred != labels).ravel()
+    # Calculate Confution matrix.
+    cm = _calc_semantic_segmentation_confusion(
+        pred, updated_labels, num_classes, ignore_label
+    )
+    true_positives = jnp.diag(cm)
+    false_negatives = jnp.sum(cm, axis=1) - true_positives
 
     # Calculate ground truth counts.
-    gt_counter = jnp.ones((num_classes,))
-    gt_index, gt_count = jnp.unique(logits, return_counts=True)
+    gt_counter = false_negatives + true_positives
+    gt_counter = jnp.where(gt_counter > 0, gt_counter, 1)
 
-    # Map ignored label to an exisiting one
-    gt_count = gt_count.at[gt_index == ignore_label].set(gt_count[1])
-    gt_index = gt_count.at[gt_index == ignore_label].set(1)
-    gt_counter = gt_count.at[gt_index].set(gt_count).astype(jnp.float32)
-
-    # calculate false negative counts
-    fn_counter = jnp.ones((num_classes))
-    fn = labels.ravel()[index]
-    fn_idx, fn_count = jnp.unique(fn, return_counts=True)
-
-    # map ignored label to an exisiting one
-    fn_count = fn_count.at[fn_idx == ignore_label].set(fn_count[1])
-    fn_idx = fn_idx.at[fn_idx == ignore_label].set(1)
-    fn_counter = fn_counter.at[fn_idx].set(fn_count).astype(jnp.float32)
+    # Calculate false negative counts
+    fn_counter = false_negatives
+    fn_counter = jnp.where(fn_counter > 0, fn_counter, 1)
 
     if class_weights is not None:
         class_weights = 0.5 * (fn_counter / gt_counter) + 0.5 * class_weights
@@ -201,7 +193,7 @@ def recall_cross_entory_loss(
     cross_entropy_loss = optax.softmax_cross_entropy(
         logits=logits, labels=one_hot_labels
     )
-    loss = class_weights[labels] * cross_entropy_loss
+    loss = class_weights[jnp.squeeze(labels)] * cross_entropy_loss
     num_valid_values = jnp.sum(valid_mask)
 
     return jnp.sum(loss) / (num_valid_values + epsilon)
