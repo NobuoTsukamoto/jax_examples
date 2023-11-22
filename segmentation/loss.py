@@ -148,7 +148,7 @@ def ohem_cross_entropy_loss(
     return jnp.mean(loss) / (jnp.mean(valid_mask) + epsilon)
 
 
-def recall_cross_entory_loss(
+def recall_cross_entroy_loss(
     logits, labels, num_classes, ignore_label=255, class_weights=None, epsilon=1e-5
 ):
     """
@@ -187,13 +187,21 @@ def recall_cross_entory_loss(
     else:
         class_weights = fn_counter / gt_counter
 
+    valid_mask = jnp.any(valid_mask, axis=-1).astype(jnp.float32)
+
     one_hot_labels = jnp.squeeze(
         jax.nn.one_hot(updated_labels, num_classes=num_classes), axis=3
     )
     cross_entropy_loss = optax.softmax_cross_entropy(
         logits=logits, labels=one_hot_labels
     )
-    loss = class_weights[jnp.squeeze(labels)] * cross_entropy_loss
+    weight_mask = jnp.einsum(
+        "...y,y->...",
+        one_hot_labels,
+        class_weights,
+    )
+    cross_entropy_loss *= weight_mask
     num_valid_values = jnp.sum(valid_mask)
 
-    return jnp.sum(loss) / (num_valid_values + epsilon)
+    cross_entropy_loss *= valid_mask
+    return jnp.sum(cross_entropy_loss) / (num_valid_values + epsilon)
