@@ -28,7 +28,7 @@ from jax import lax
 import input_pipeline
 import models
 from miou_metrics import eval_semantic_segmentation
-from loss import cross_entropy_loss, ohem_cross_entropy_loss, recall_cross_entory_loss
+from loss import create_loss_fn
 
 
 def create_model(*, model_cls, half_precision, num_classes, output_size, **kwargs):
@@ -65,14 +65,8 @@ def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
     )
 
 
-def compute_metrics(logits, labels, num_classes, ignore_label, class_weights=None):
-    loss = recall_cross_entory_loss(
-        logits,
-        labels,
-        num_classes,
-        ignore_label=ignore_label,
-        class_weights=class_weights,
-    )
+def compute_metrics(logits, labels, loss_fn, num_classes, ignore_label):
+    loss = loss_fn(logits, labels)
     segmentation_metrics = semantic_segmentation_metrics(
         logits, labels, num_classes, ignore_label
     )
@@ -110,16 +104,16 @@ def train_step(
     state,
     batch,
     learning_rate_fn,
+    loss_fn,
     num_classes,
     ignore_label,
-    class_weights=None,
     dropout_rng=None,
 ):
     """Perform a single training step."""
 
     dropout_rng, new_dropout_rng = jax.random.split(dropout_rng)
 
-    def loss_fn(params):
+    def _loss_fn(params):
         """loss function used for training."""
         logits, new_model_state = state.apply_fn(
             {"params": params, "batch_stats": state.batch_stats},
@@ -127,22 +121,10 @@ def train_step(
             mutable=["batch_stats"],
             rngs={"dropout": dropout_rng},
         )
-        loss = recall_cross_entory_loss(
-            logits["output"],
-            batch["label"],
-            num_classes,
-            ignore_label=ignore_label,
-            class_weights=class_weights,
-        )
+        loss = loss_fn(logits["output"], batch["label"])
         aux_loss = 0
         if "aux_loss" in logits:
-            aux_loss = 0.4 * recall_cross_entory_loss(
-                logits["aux_loss"],
-                batch["label"],
-                num_classes,
-                ignore_label=ignore_label,
-                class_weights=class_weights,
-            )
+            aux_loss = 0.4 * loss_fn(logits["aux_loss"], batch["label"])
         weight_decay = 0.00004
         # weight_penalty_params = jax.tree_util.tree_leaves(params)
         # weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
@@ -162,17 +144,23 @@ def train_step(
         lr = learning_rate_fn(step)
 
     if dynamic_scale:
-        grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
+        grad_fn = dynamic_scale.value_and_grad(
+            _loss_fn, has_aux=True, axis_name="batch"
+        )
         dynamic_scale, is_fin, aux, grads = grad_fn(state.params)
         # dynamic loss takes care of averaging gradients across replicas
     else:
-        grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+        grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
         aux, grads = grad_fn(state.params)
         # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
         grads = lax.pmean(grads, axis_name="batch")
     new_model_state, logits = aux[1]
     metrics = compute_metrics(
-        logits["output"], batch["label"], num_classes, ignore_label, class_weights
+        logits["output"],
+        batch["label"],
+        loss_fn,
+        num_classes=num_classes,
+        ignore_label=ignore_label,
     )
 
     if learning_rate_fn is not None:
@@ -200,11 +188,11 @@ def train_step(
     return new_state, metrics, new_dropout_rng
 
 
-def eval_step(state, batch, num_classes, ignore_label, class_weights=None):
+def eval_step(state, batch, loss_fn, num_classes, ignore_label):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     return compute_metrics(
-        logits["output"], batch["label"], num_classes, ignore_label, class_weights
+        logits["output"], batch["label"], loss_fn, num_classes, ignore_label
     )
 
 
@@ -420,6 +408,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         config, base_learning_rate, steps_per_epoch
     )
 
+    loss_fn = create_loss_fn(config)
+
     state = create_train_state(rngs, config, model, config.image_size, learning_rate_fn)
     state = restore_checkpoint(state, workdir)
     # step_offset > 0 if restarting from checkpoint
@@ -430,18 +420,18 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         functools.partial(
             train_step,
             learning_rate_fn=learning_rate_fn,
+            loss_fn=loss_fn,
             num_classes=num_classes,
             ignore_label=config.ignore_label,
-            class_weights=config.class_weights,
         ),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
         functools.partial(
             eval_step,
+            loss_fn=loss_fn,
             num_classes=num_classes,
             ignore_label=config.ignore_label,
-            class_weights=config.class_weights,
         ),
         axis_name="batch",
     )

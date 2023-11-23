@@ -16,7 +16,7 @@ def get_config():
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
-    config.dataset_dir = None
+    config.dataset_dir = "/workdir/tensorflow_datasets/"
     config.num_classes = 19
     config.model_input = (512, 1024)
 
@@ -44,5 +44,8 @@ def get_config():
     config.steps_per_eval = -1
 
     config.ignore_label = 255
+
+    config.loss = "cross_entropy_loss"
+    config.label_smoothing = 0.0
 
     return config

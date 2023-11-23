@@ -45,8 +45,15 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 | Fully Convolutional Networks for Semantic Segmentation | https://arxiv.org/abs/1411.4038 |
 | Simple and Efficient Architectures for Semantic Segmentation | https://arxiv.org/abs/2206.08236 |
 | DABNet: Depth-wise Asymmetric Bottleneck for Real-time Semantic Segmentation | https://arxiv.org/abs/1907.11357 |
-| Training Region-based Object Detectors with Online Hard Example Mining | https://arxiv.org/abs/1604.03540 |
-| Striking the Right Balance: Recall Loss for Semantic Segmentation | https://arxiv.org/abs/2106.14917 |
+
+## Loss function
+| Loss | Paper's | URL | Task |
+|:--|:-- |:--|:--|
+| Cross Entropy Loss with class weight | - | - | Semantic Segmentation |
+| OHEM Loss | Training Region-based Object Detectors with Online Hard Example Mining | https://arxiv.org/abs/1604.03540 | Semantic Segmentation |
+| Recall Loss | Striking the Right Balance: Recall Loss for Semantic Segmentation | https://arxiv.org/abs/2106.14917 | Semantic Segmentation |
+| Focal Loss | Focal Loss for Dense Object Detection | https://arxiv.org/abs/1708.02002 | Semantic Segmentation |
+| Soft IoU Loss | Optimizing Intersection-Over-Union in Deep Neural Networks for Image Segmentation | https://home.cs.umanitoba.ca/~ywang/papers/isvc16.pdf | Semantic Segmentation |
 
 # Installation
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2023 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -15,6 +15,7 @@ import jax
     Based on chainer's eval_semantic_segmentation.
 
     chainercv.evaluations.eval_semantic_segmentation
+    https://github.com/chainer/chainercv/blob/master/chainercv/evaluations/eval_semantic_segmentation.py
 """
 
 

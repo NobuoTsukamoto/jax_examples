@@ -13,6 +13,60 @@ import jax
 import jax.numpy as jnp
 import optax
 
+import ml_collections
+from functools import partial
+from absl import logging
+
+
+def create_loss_fn(
+    config: ml_collections.ConfigDict,
+):
+    if config.loss == "ohem_loss":
+        logging.info("Select OHEM Loss for the Loss function.")
+        loss_fn = partial(
+            ohem_cross_entropy_loss,
+            num_classes=config.num_classes,
+            ignore_label=config.ignore_label,
+            class_weights=config.class_weights,
+        )
+
+    elif config.loss == "recall_loss":
+        logging.info("Select Recall Loss for the Loss function.")
+        loss_fn = partial(
+            recall_cross_entroy_loss,
+            num_classes=config.num_classes,
+            ignore_label=config.ignore_label,
+            class_weights=config.class_weights,
+        )
+
+    elif config.loss == "softiou_loss":
+        logging.info("Select Soft IoU Loss for the Loss function.")
+        loss_fn = partial(
+            soft_iou_cross_entroy_loss,
+            num_classes=config.num_classes,
+            ignore_label=config.ignore_label,
+        )
+
+    elif config.loss == "focal_loss":
+        logging.info("Select Focal Loss for the Loss function.")
+        loss_fn = partial(
+            focal_cross_entropy_loss,
+            num_classes=config.num_classes,
+            ignore_label=config.ignore_label,
+        )
+
+    else:  # cross entropy loss
+        logging.info("Select Cross Entropy Loss for the Loss function.")
+        loss_fn = partial(
+            cross_entropy_loss,
+            num_classes=config.num_classes,
+            ignore_label=config.ignore_label,
+            class_weights=config.class_weights,
+            label_smoothing=config.label_smoothing,
+        )
+
+    return loss_fn
+
 
 def cross_entropy_loss(
     logits,
@@ -205,3 +259,62 @@ def recall_cross_entroy_loss(
 
     cross_entropy_loss *= valid_mask
     return jnp.sum(cross_entropy_loss) / (num_valid_values + epsilon)
+
+
+def focal_cross_entropy_loss(
+    logits,
+    labels,
+    num_classes,
+    ignore_label=255,
+    epsilon=1e-5,
+    alpha=0.25,
+    gamma=2,
+):
+    """
+    Focal Loss for Dense Object Detection
+
+    Reference
+        https://arxiv.org/abs/1708.02002
+    """
+    valid_mask = jnp.not_equal(labels, ignore_label)
+    updated_labels = jnp.where(valid_mask, labels, -jnp.ones_like(labels))
+
+    one_hot_labels = jnp.squeeze(
+        jax.nn.one_hot(updated_labels, num_classes=num_classes), axis=3
+    )
+    cross_entropy_loss = optax.softmax_cross_entropy(
+        logits=logits, labels=one_hot_labels
+    )
+
+    valid_mask = jnp.any(valid_mask, axis=-1).astype(jnp.float32)
+
+    pt = jnp.exp(-cross_entropy_loss)
+    focal_loss = alpha * ((1 - pt) ** gamma) * cross_entropy_loss
+
+    num_valid_values = jnp.sum(valid_mask)
+
+    return jnp.sum(focal_loss) / (num_valid_values + epsilon)
+
+
+def soft_iou_cross_entroy_loss(
+    logits, labels, num_classes, ignore_label=255, epsilon=1e-5
+):
+    """
+    Optimizing Intersection-Over-Union in Deep Neural Networks for Image Segmentation
+
+    Reference
+        https://home.cs.umanitoba.ca/~ywang/papers/isvc16.pdf
+    """
+    pred = jax.nn.softmax(logits, axis=-1)
+
+    valid_mask = jnp.not_equal(labels, ignore_label)
+    updated_labels = jnp.where(valid_mask, labels, -jnp.ones_like(labels))
+    one_hot_labels = jnp.squeeze(
+        jax.nn.one_hot(updated_labels, num_classes=num_classes), axis=3
+    )
+
+    intersection = pred * one_hot_labels
+    union = pred + one_hot_labels - (pred * one_hot_labels)
+    loss = jnp.sum(intersection) / (jnp.sum(union) + epsilon)
+
+    return 1 - loss
