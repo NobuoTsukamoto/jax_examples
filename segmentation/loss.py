@@ -237,7 +237,7 @@ def recall_cross_entroy_loss(
     fn_counter = jnp.where(fn_counter > 0, fn_counter, 1)
 
     if class_weights is not None:
-        class_weights = 0.5 * (fn_counter / gt_counter) + 0.5 * class_weights
+        class_weights = 0.5 * (fn_counter / gt_counter) + 0.5 * jnp.array(class_weights)
     else:
         class_weights = fn_counter / gt_counter
 
