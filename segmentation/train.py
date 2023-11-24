@@ -107,6 +107,7 @@ def train_step(
     loss_fn,
     num_classes,
     ignore_label,
+    weight_decay=None,
     dropout_rng=None,
 ):
     """Perform a single training step."""
@@ -125,16 +126,16 @@ def train_step(
         aux_loss = 0
         if "aux_loss" in logits:
             aux_loss = 0.4 * loss_fn(logits["aux_loss"], batch["label"])
-        weight_decay = 0.00004
-        # weight_penalty_params = jax.tree_util.tree_leaves(params)
-        # weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
-        weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
-        weight_l2 = sum(
-            jnp.sum(x[1] ** 2)
-            for x in weight_penalty_params
-            if x[1].ndim > 1 and "DepthwiseSeparable" not in x[0][0].key
-        )
-        weight_penalty = weight_decay * 0.5 * weight_l2
+
+        weight_penalty = 0
+        if weight_decay is not None:
+            weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
+            weight_l2 = sum(
+                jnp.sum(x[1] ** 2)
+                for x in weight_penalty_params
+                if x[1].ndim > 1 and "DepthwiseSeparable" not in x[0][0].key
+            )
+            weight_penalty = weight_decay * 0.5 * weight_l2
         loss = loss + aux_loss + weight_penalty
         return loss, (new_model_state, logits)
 
@@ -423,6 +424,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             loss_fn=loss_fn,
             num_classes=num_classes,
             ignore_label=config.ignore_label,
+            weight_decay=config.weight_decay
         ),
         axis_name="batch",
     )

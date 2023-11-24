@@ -31,6 +31,7 @@ def get_config():
     ]
     # config.class_weights = None
     # fmt: on
+    config.weight_decay = None
 
     # Data augmentation
     config.image_size = (1024, 2048)
