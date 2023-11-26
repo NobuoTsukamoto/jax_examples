@@ -15,45 +15,45 @@ def get_config():
     config = ml_collections.ConfigDict()
 
     # As defined in the `models` module.
-    config.model = "MobileNetV3_Large"
-    config.image_size = (224, 224)
+    config.model = "ResNet50"
+    config.image_size = 224
 
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "imagenette/full-size-v2:1.*.*"
+    config.dataset_dir = "/workdir/tensorflow_datasets/"
 
-    config.optimizer = "adamw"
-    config.learning_rate = 0.001
+    config.learning_rate = 0.1
     config.warmup_epochs = 5.0
     config.momentum = 0.9
     config.batch_size = 64
 
-    config.num_epochs = 300.0
-    config.log_every_steps = 147
+    config.num_epochs = 100.0
+    config.log_every_steps = 100
 
     config.cache = False
     config.half_precision = False
 
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
-    config.aug_type = "randaug"     # randaug, autoaug, None
+    config.aug_type = "randaug"  # randaug, autoaug, none
 
     # autoaug
     config.autoaug_augmentation_name = "v0"
-    config.autoaug_cutout_const = 100.
-    config.autoaug_translate_const = 250.
+    config.autoaug_cutout_const = 100.0
+    config.autoaug_translate_const = 250.0
 
     # randomarug
     config.randaug_num_layers = 2
-    config.randaug_magnitude = 10.
-    config.randaug_cutout_const = 40.
-    config.randaug_translate_const = 0.
+    config.randaug_magnitude = 10.0
+    config.randaug_cutout_const = 40.0
+    config.randaug_translate_const = 0.0
     config.randaug_prob_to_apply = None
     config.randaug_exclude_ops = ["Cutout"]
 
-    config.color_jitter = 0.
+    config.color_jitter = 0.0
 
     # random erasing
-    config.random_erasing = True
+    config.random_erasing = False
     config.random_erasing_probability = 0.25
     config.random_erasing_min_area = 0.02
     config.random_erasing_max_area = 1 / 3
@@ -63,7 +63,7 @@ def get_config():
     config.random_erasing_max_count = 1
     config.random_erasing_trials = 10
 
-    config.mixup_and_cutmix = True
+    config.mixup_and_cutmix = False
     config.mixup_and_cutmix_mixup_alpha = 0.8
     config.mixup_and_cutmix_cutmix_alpha = 1.0
     config.mixup_and_cutmix_prob = 1.0

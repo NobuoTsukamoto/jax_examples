@@ -40,7 +40,7 @@ class MobileNetV3Backbone(nn.Module):
     norm: ModuleDef = nn.BatchNorm
 
     @nn.compact
-    def __call__(self, x, train: bool = True):
+    def __call__(self, x):
         inverted_res_block = partial(
             InvertedResBlockMobileNetV3, conv=self.conv, norm=self.norm
         )
