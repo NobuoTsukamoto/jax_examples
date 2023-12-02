@@ -45,6 +45,7 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 | Fully Convolutional Networks for Semantic Segmentation | https://arxiv.org/abs/1411.4038 |
 | Simple and Efficient Architectures for Semantic Segmentation | https://arxiv.org/abs/2206.08236 |
 | DABNet: Depth-wise Asymmetric Bottleneck for Real-time Semantic Segmentation | https://arxiv.org/abs/1907.11357 |
+| LEDNet: A Lightweight Encoder-Decoder Network for Real-time Semantic Segmentation | https://arxiv.org/abs/1905.02423 |
 
 ## Loss function
 | Loss | Paper's | URL | Task |

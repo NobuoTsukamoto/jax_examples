@@ -34,7 +34,8 @@ from implements.ff_net import (
     ResNet46NS,
 )
 from implements.dab_net import DABNet
-from implements.common_layer import ResNetBlock, BottleneckResNetBlock
+from implements.led_net import LEDNet
+from implements.common_layer import ResNetBlock
 
 # FastSCNN
 Fast_SCNN = partial(FastSCNN)
@@ -109,3 +110,6 @@ FFNet_ResNet46NS_CCC = partial(
 
 # DAB Net
 DAB_Net = partial(DABNet)
+
+# LEDNet
+LEDNet = partial(LEDNet)
