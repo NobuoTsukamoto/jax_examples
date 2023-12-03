@@ -161,7 +161,7 @@ def create_split(
         split_size = train_examples // jax.process_count()
         start = jax.process_index() * split_size
         split = "train[{}:{}]".format(start, start + split_size)
-    
+
         num_classes = dataset_builder.info.features["label"].num_classes
 
         if config.aug_type == "autoaug":

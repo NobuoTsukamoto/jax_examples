@@ -43,10 +43,10 @@ class ResNetBlock(nn.Module):
     @nn.compact
     def __call__(self, x):
         residual = x
-        y = self.conv(self.features, (3, 3), self.strides)(x)
+        y = self.conv(self.features, kernel_size=(3, 3), strides=self.strides)(x)
         y = self.norm()(y)
         y = self.act(y)
-        y = self.conv(self.features, (3, 3))(y)
+        y = self.conv(self.features, kernel_size=(3, 3))(y)
         y = self.norm(scale_init=nn.initializers.zeros_init())(y)
 
         if residual.shape != y.shape:
