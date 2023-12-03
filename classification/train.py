@@ -16,14 +16,16 @@ import jax.numpy as jnp
 import ml_collections
 import models
 import optax
+import orbax
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from absl import logging
 from clu import metric_writers, periodic_actions
 from flax import jax_utils
-from flax.training import checkpoints, common_utils
+from flax.training import common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
 from flax.training import train_state
+from flax.training import orbax_utils
 from jax import lax, random
 
 """ Training Image classfication model.
@@ -196,8 +198,16 @@ class TrainState(train_state.TrainState):
     dynamic_scale: dynamic_scale_lib.DynamicScale
 
 
-def restore_checkpoint(state, workdir):
-    return checkpoints.restore_checkpoint(workdir, state)
+def restore_checkpoint(checkpoint_manager, state):
+    restore_args = orbax_utils.restore_args_from_target(state, mesh=None)
+    if checkpoint_manager.latest_step() is not None:
+        return checkpoint_manager.restore(
+            checkpoint_manager.latest_step(),
+            items=state,
+            restore_kwargs={"restore_args": restore_args},
+        )
+    else:
+        return state
 
 
 def get_input_dtype(half_precision):
@@ -213,12 +223,13 @@ def get_input_dtype(half_precision):
     return input_dtype
 
 
-def save_checkpoint(state, workdir):
+def save_checkpoint(checkpoint_manager, state):
     if jax.process_index() == 0:
         # get train state from the first replica
         state = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
+        save_args = orbax_utils.save_args_from_target(state)
         step = int(state.step)
-        checkpoints.save_checkpoint(workdir, state, step, keep=3)
+        checkpoint_manager.save(step, state, save_kwargs={'save_args': save_args})
 
 
 # pmean only works inside pmap because it needs an axis name.
@@ -319,8 +330,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         config, base_learning_rate, steps_per_epoch
     )
 
+    checkpoint_manager_options = orbax.checkpoint.CheckpointManagerOptions(
+        create=True, max_to_keep=3
+    )
+    checkpoint_manager = orbax.checkpoint.CheckpointManager(
+        workdir,
+        orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler()),
+        checkpoint_manager_options,
+    )
+
     state = create_train_state(rng, config, model, config.image_size, learning_rate_fn)
-    state = restore_checkpoint(state, workdir)
+    state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
     state = jax_utils.replicate(state)
@@ -391,7 +411,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
             state = sync_batch_stats(state)
-            save_checkpoint(state, workdir)
+            save_checkpoint(checkpoint_manager, state)
 
     # Wait until computations are done before exiting
     jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
