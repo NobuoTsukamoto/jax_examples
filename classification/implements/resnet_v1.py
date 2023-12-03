@@ -8,7 +8,7 @@
 """
 
 from functools import partial
-from typing import Any, Callable, Sequence, Tuple
+from typing import Any, Callable, Sequence
 
 from flax import linen as nn
 import jax.numpy as jnp
