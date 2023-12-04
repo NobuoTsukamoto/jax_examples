@@ -185,11 +185,11 @@ def ohem_cross_entropy_loss(
     # make the invalid region as ignore
     updated_labels = updated_labels + (1 - valid_mask) * ignore_label
 
-    updated_labels = updated_labels.reshape((batch, height, width))
+    updated_labels = updated_labels.reshape((batch, height, width, 1))
     one_hot_labels = jnp.squeeze(
         jax.nn.one_hot(updated_labels, num_classes=num_classes), axis=3
     )
-    valid_mask = valid_mask.reshape((batch, height, width, 1)).astype(jnp.float32)
+    valid_mask = valid_mask.reshape((batch, height, width)).astype(jnp.float32)
     loss = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
 
     weight_mask = jnp.einsum(
@@ -197,9 +197,11 @@ def ohem_cross_entropy_loss(
         one_hot_labels,
         class_weights,
     )
+
     loss = loss * weight_mask
     loss = loss * valid_mask
     return jnp.mean(loss) / (jnp.mean(valid_mask) + epsilon)
+     
 
 
 def recall_cross_entroy_loss(
