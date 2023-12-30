@@ -21,6 +21,7 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 - [JAX: Autograd and XLA](https://github.com/google/jax)
 - [Flax: A neural network library and ecosystem for JAX designed for flexibility](https://github.com/google/flax)
 - [Optax](https://github.com/deepmind/optax)
+- [Orbax](https://github.com/google/orbax/tree/main)
 
 # Models
 
