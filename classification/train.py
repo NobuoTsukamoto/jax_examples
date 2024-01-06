@@ -113,11 +113,6 @@ def train_step(state, batch, learning_rate_fn, num_classes):
             mutable=["batch_stats"],
         )
         loss = cross_entropy_loss(logits, batch["label"], num_classes)
-        weight_penalty_params = jax.tree_util.tree_leaves(params)
-        weight_decay = 0.0001
-        weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
-        weight_penalty = weight_decay * 0.5 * weight_l2
-        loss = loss + weight_penalty
         return loss, (new_model_state, logits)
 
     step = state.step
@@ -229,7 +224,7 @@ def save_checkpoint(checkpoint_manager, state):
         state = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
         save_args = orbax_utils.save_args_from_target(state)
         step = int(state.step)
-        checkpoint_manager.save(step, state, save_kwargs={'save_args': save_args})
+        checkpoint_manager.save(step, state, save_kwargs={"save_args": save_args})
 
 
 # pmean only works inside pmap because it needs an axis name.
@@ -256,11 +251,19 @@ def create_train_state(
         dynamic_scale = None
 
     params, batch_stats = initialized(rng, image_size, model)
-    tx = optax.sgd(
-        learning_rate=learning_rate_fn,
-        momentum=config.momentum,
-        nesterov=True,
-    )
+    if config.optimizer == "adamw":
+        tx = optax.adamw(
+            learning_rate=learning_rate_fn, weight_decay=config.weight_decay
+        )
+
+    elif config.optimizer == "sgd":
+        tx = optax.chain(
+            optax.sgd(
+                learning_rate=learning_rate_fn, momentum=config.momentum, nesterov=True
+            ),
+            optax.add_decayed_weights(weight_decay=config.weight_decay),
+        )
+
     state = TrainState.create(
         apply_fn=model.apply,
         params=params,
