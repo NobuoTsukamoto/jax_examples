@@ -23,6 +23,7 @@ def get_config():
     config.dataset_dir = "/workdir/tensorflow_datasets/"
 
     config.optimizer = "sgd"
+    config.adamw_weight_decay = 0.0001
     config.learning_rate = 0.1
     config.warmup_epochs = 5.0
     config.momentum = 0.9
@@ -34,7 +35,6 @@ def get_config():
     config.cache = False
     config.half_precision = False
 
-    config.weight_decay = 0.0001
 
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
