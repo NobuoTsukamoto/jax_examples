@@ -35,7 +35,6 @@ def get_config():
     config.cache = False
     config.half_precision = False
 
-
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
     config.aug_type = "randaug"  # randaug, autoaug, none
