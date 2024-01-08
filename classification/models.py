@@ -12,8 +12,8 @@ from implements.mobilenet_v1 import MobileNetV1
 from implements.mobilenet_v2 import MobileNetV2
 from implements.mobilenet_v3 import MobileNetV3, Large, Small
 from implements.resnet_v2 import ResNetV2, ResNet50V2_layer
-
 from implements.resnet_v1 import ResNet
+
 from implements.common_layer import ResNetBlock, BottleneckResNetBlock
 
 # MobileNetV1 alpha=1.0 depth_multiplier=1.0

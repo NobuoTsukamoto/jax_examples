@@ -46,7 +46,7 @@ def preprocess_for_train(
 
     # Crops image.
     cropped_image = tfm.vision.preprocess_ops.random_crop_image(
-        image, area_range=config.crop_area_range
+        image, area_range=config.crop_area_range, seed=config.seed
     )
 
     image = tf.cond(
@@ -56,12 +56,16 @@ def preprocess_for_train(
     )
 
     if config.aug_rand_horizontal_flip:
-        image = tf.image.random_flip_left_right(image)
+        image = tf.image.random_flip_left_right(image, seed=config.seed)
 
     # Color jitter.
     if config.color_jitter > 0:
         image = tfm.vision.color_jitter(
-            image, config.color_jitter, config.color_jitter, config.color_jitter
+            image,
+            config.color_jitter,
+            config.color_jitter,
+            config.color_jitter,
+            seed=config.seed
         )
 
     # Resizes image.
@@ -245,7 +249,7 @@ def create_split(
 
     if train:
         ds = ds.repeat()
-        ds = ds.shuffle(16 * batch_size, seed=42)
+        ds = ds.shuffle(16 * batch_size, seed=config.seed)
 
     ds = ds.map(decode_example, num_parallel_calls=tf.data.AUTOTUNE)
     ds = ds.batch(batch_size, drop_remainder=True)

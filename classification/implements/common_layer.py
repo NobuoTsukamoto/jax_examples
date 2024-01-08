@@ -8,10 +8,11 @@
 """
 
 from functools import partial
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Optional
 
 import jax.numpy as jnp
 import jax.nn as jnn
+from jax import lax, random
 from flax import linen as nn
 
 ModuleDef = Any
@@ -37,8 +38,10 @@ class ResNetBlock(nn.Module):
     features: int
     conv: ModuleDef
     norm: ModuleDef
+    stochastic_depth: ModuleDef
     act: Callable
-    strides: Tuple[int, int] = (1, 1)
+    strides: Optional[Tuple[int, int]] = (1, 1)
+    stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, x):
@@ -54,6 +57,11 @@ class ResNetBlock(nn.Module):
                 residual
             )
             residual = self.norm(name="norm_proj")(residual)
+
+        if self.stochastic_depth_drop_rate > 0.0:
+            y = self.stochastic_depth(
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+            )(y)
 
         return self.act(residual + y)
 
@@ -128,8 +136,10 @@ class BottleneckResNetBlock(nn.Module):
     features: int
     conv: ModuleDef
     norm: ModuleDef
+    stochastic_depth: ModuleDef
     act: Callable
-    strides: Tuple[int, int] = (1, 1)
+    strides: Optional[Tuple[int, int]] = (1, 1)
+    stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, x):
@@ -149,6 +159,10 @@ class BottleneckResNetBlock(nn.Module):
             )(residual)
             residual = self.norm(name="norm_proj")(residual)
 
+        if self.stochastic_depth_drop_rate > 0.0:
+            y = self.stochastic_depth(
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+            )(y)
         return self.act(residual + y)
 
 

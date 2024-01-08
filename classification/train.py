@@ -8,7 +8,7 @@
 """
 import functools
 import time
-from typing import Any
+from typing import Any, Dict
 
 import input_pipeline
 import jax
@@ -54,7 +54,7 @@ def initialized(key, image_size, model):
     def init(*args):
         return model.init(*args)
 
-    variables = init({"params": key}, jnp.ones(input_shape, model.dtype))
+    variables = init(key, jnp.ones(input_shape, model.dtype))
     return variables["params"], variables["batch_stats"]
 
 
@@ -102,8 +102,20 @@ def create_learning_rate_fn(
     return schedule_fn
 
 
-def train_step(state, batch, learning_rate_fn, num_classes):
+def train_step(
+    state,
+    batch,
+    learning_rate_fn,
+    num_classes,
+    dropout_rng=None,
+    stochastic_depth_rng=None,
+):
     """Perform a single training step."""
+
+    dropout_rng, new_dropout_rng = jax.random.split(dropout_rng)
+    stochastic_depth_rng, new_stochastic_depth_rng = jax.random.split(
+        stochastic_depth_rng
+    )
 
     def loss_fn(params):
         """loss function used for training."""
@@ -111,6 +123,7 @@ def train_step(state, batch, learning_rate_fn, num_classes):
             {"params": params, "batch_stats": state.batch_stats},
             batch["image"],
             mutable=["batch_stats"],
+            rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
         )
         loss = cross_entropy_loss(logits, batch["label"], num_classes)
         weight_penalty_params = jax.tree_util.tree_leaves(params)
@@ -156,7 +169,7 @@ def train_step(state, batch, learning_rate_fn, num_classes):
         )
         metrics["scale"] = dynamic_scale.scale
 
-    return new_state, metrics
+    return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
 
 def eval_step(state, batch, num_classes):
@@ -245,7 +258,11 @@ def sync_batch_stats(state):
 
 
 def create_train_state(
-    rng, config: ml_collections.ConfigDict, model, image_size, learning_rate_fn
+    rngs: Dict[str, jnp.ndarray],
+    config: ml_collections.ConfigDict,
+    model,
+    image_size,
+    learning_rate_fn,
 ):
     """Create initial training state."""
     dynamic_scale = None
@@ -255,7 +272,7 @@ def create_train_state(
     else:
         dynamic_scale = None
 
-    params, batch_stats = initialized(rng, image_size, model)
+    params, batch_stats = initialized(rngs, image_size, model)
     if config.optimizer == "adamw":
         tx = optax.adamw(
             learning_rate=learning_rate_fn, weight_decay=config.adamw_weight_decay
@@ -291,7 +308,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         logdir=workdir, just_logging=jax.process_index() != 0
     )
 
-    rng = random.PRNGKey(0)
+    rng = jax.random.PRNGKey(seed=config.seed)
+    params_rng, dropout_rng, stochastic_depth_rng = jax.random.split(rng, num=3)
+    rngs = {
+        "params": params_rng,
+        "dropout": dropout_rng,
+        "stochastic_depth": stochastic_depth_rng,
+    }
 
     if config.batch_size % jax.device_count() > 0:
         raise ValueError("Batch size must be divisible by the number of devices")
@@ -331,6 +354,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         model_cls=model_cls,
         half_precision=config.half_precision,
         num_classes=num_classes,
+        init_stochastic_depth_rate=config.init_stochastic_depth_rate,
     )
 
     learning_rate_fn = create_learning_rate_fn(
@@ -346,7 +370,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         checkpoint_manager_options,
     )
 
-    state = create_train_state(rng, config, model, config.image_size, learning_rate_fn)
+    state = create_train_state(rngs, config, model, config.image_size, learning_rate_fn)
     state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
@@ -362,6 +386,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         functools.partial(eval_step, num_classes=num_classes), axis_name="batch"
     )
 
+    dropout_rngs = jax.random.split(dropout_rng, jax.local_device_count())
+    stochastic_depth_rngs = jax.random.split(
+        stochastic_depth_rng, jax.local_device_count()
+    )
     train_metrics = []
     hooks = []
     if jax.process_index() == 0:
@@ -370,7 +398,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
     logging.info("Initial compilation, this might take some minutes...")
 
     for step, batch in zip(range(step_offset, num_steps), train_iter):
-        state, metrics = p_train_step(state, batch)
+        state, metrics, dropout_rngs, stochastic_depth_rngs = p_train_step(
+            state,
+            batch,
+            dropout_rng=dropout_rngs,
+            stochastic_depth_rng=stochastic_depth_rngs,
+        )
         for h in hooks:
             h(step)
         if step == step_offset:

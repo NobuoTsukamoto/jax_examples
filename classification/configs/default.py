@@ -77,6 +77,10 @@ def get_config():
 
     config.three_augment = False
 
+    config.init_stochastic_depth_rate = 0.0
+
+    config.seed = 42
+
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
     config.num_train_steps = -1

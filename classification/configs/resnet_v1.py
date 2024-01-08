@@ -29,4 +29,6 @@ def get_config():
     config.random_erasing = True
     config.mixup_and_cutmix = True
 
+    config.init_stochastic_depth_rate = 0.2
+
     return config
