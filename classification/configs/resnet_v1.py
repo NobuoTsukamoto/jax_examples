@@ -17,13 +17,16 @@ def get_config():
     # As defined in the `models` module.
     config.model = "ResNet50"
 
-    config.learning_rate = 0.1
-    config.warmup_epochs = 5.0
+    config.optimizer = "adamw"
+    config.learning_rate = 0.004
+    config.adamw_weight_decay = 0.05
+    config.warmup_epochs = 0.066
     config.momentum = 0.9
     config.batch_size = 64
 
-    config.aug_type = "none"
-
-    config.num_epochs = 100.0
+    config.num_epochs = 300
+    config.aug_type = "randaug"
+    config.random_erasing = True
+    config.mixup_and_cutmix = True
 
     return config
