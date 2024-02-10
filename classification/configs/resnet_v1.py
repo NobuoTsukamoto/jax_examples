@@ -29,6 +29,15 @@ def get_config():
     config.random_erasing = True
     config.mixup_and_cutmix = True
 
-    config.init_stochastic_depth_rate = 0.2
+    # randomarug
+    config.randaug_num_layers = 2
+    config.randaug_magnitude = 9
+    config.randaug_cutout_const = 40.0
+    config.randaug_translate_const = 0.0
+    config.randaug_magnitude_std = 0.5
+    config.randaug_prob_to_apply = None
+    config.randaug_exclude_ops = ["Cutout"]
+
+    config.init_stochastic_depth_rate = 0.1
 
     return config
