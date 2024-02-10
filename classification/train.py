@@ -176,10 +176,10 @@ def train_step(
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
 
-def eval_step(state, batch, num_classes, label_smoothing):
+def eval_step(state, batch, num_classes):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
-    return compute_metrics(logits, batch["label"], num_classes, label_smoothing)
+    return compute_metrics(logits, batch["label"], num_classes)
 
 
 def prepare_tf_data(xs):
@@ -390,9 +390,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
-        functools.partial(
-            eval_step, num_classes=num_classes, label_smoothing=config.label_smoothing
-        ),
+        functools.partial(eval_step, num_classes=num_classes),
         axis_name="batch",
     )
 
