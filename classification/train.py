@@ -176,10 +176,10 @@ def train_step(
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
 
-def eval_step(state, batch, num_classes, compute_metrics):
+def eval_step(state, batch, num_classes, label_smoothing):
     variables = {"params": state.params, "batch_stats": state.batch_stats}
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
-    return compute_metrics(logits, batch["label"], num_classes, compute_metrics)
+    return compute_metrics(logits, batch["label"], num_classes, label_smoothing)
 
 
 def prepare_tf_data(xs):
