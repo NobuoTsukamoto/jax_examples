@@ -28,6 +28,7 @@ def get_config():
     config.warmup_epochs = 5.0
     config.momentum = 0.9
     config.batch_size = 64
+    config.label_smoothing = 0.0
 
     config.num_epochs = 100.0
     config.log_every_steps = 100

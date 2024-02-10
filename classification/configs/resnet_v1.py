@@ -23,6 +23,7 @@ def get_config():
     config.warmup_epochs = 0.066
     config.momentum = 0.9
     config.batch_size = 64
+    config.label_smoothing = 0.1
 
     config.num_epochs = 300
     config.aug_type = "randaug"
