@@ -42,7 +42,6 @@ class ConvNeXtBackbone(nn.Module):
             64,
             kernel_size=(4, 4),
             strides=(4, 4),
-            padding=[(3, 3), (3, 3)],
             name="conv_init",
         )(x)
 
