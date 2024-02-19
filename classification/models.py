@@ -15,7 +15,11 @@ from implements.resnet_v2 import ResNetV2, ResNet50V2_layer
 from implements.resnet_v1 import ResNet
 from implements.convnext import ConvNeXt
 
-from implements.common_layer import ResNetBlock, BottleneckResNetBlock
+from implements.common_layer import (
+    ResNetBlock,
+    BottleneckResNetBlock,
+    BottleneckConvNeXtBlock,
+)
 
 # MobileNetV1 alpha=1.0 depth_multiplier=1.0
 MobileNetV1_10 = partial(MobileNetV1, alpha=1.0, depth_multiplier=1.0)
@@ -56,5 +60,5 @@ ConvNeXt_T = partial(
     ConvNeXt,
     stage_sizes=[3, 3, 9, 3],
     num_filters=[64, 128, 256, 512],
-    block_cls=BottleneckResNetBlock,
+    block_cls=BottleneckConvNeXtBlock,
 )
