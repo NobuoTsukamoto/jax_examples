@@ -59,6 +59,6 @@ ResNet50V2 = partial(ResNetV2, layers=ResNet50V2_layer)
 ConvNeXt_T = partial(
     ConvNeXt,
     stage_sizes=[3, 3, 9, 3],
-    num_filters=[64, 128, 256, 512],
+    num_filters=[96, 192, 384, 768],
     block_cls=BottleneckConvNeXtBlock,
 )
