@@ -180,7 +180,7 @@ class BottleneckConvNeXtBlock(nn.Module):
     @nn.compact
     def __call__(self, x):
         residual = x
-        y = self.conv(self.features, (1, 1))(x)
+        y = self.conv(self.features * 4, (1, 1))(x)
         y = self.norm()(y)
         y = self.act(y)
         # Depthwise
@@ -194,13 +194,13 @@ class BottleneckConvNeXtBlock(nn.Module):
         )(y)
         y = self.norm()(y)
         y = self.act(y)
-        y = self.conv(self.features * 4, (1, 1))(y)
+        y = self.conv(self.features, (1, 1))(y)
         y = self.norm(scale_init=nn.initializers.zeros_init())(y)
 
         if residual.shape != y.shape:
-            residual = self.conv(
-                self.features * 4, (1, 1), self.strides, name="conv_proj"
-            )(residual)
+            residual = self.conv(self.features, (1, 1), self.strides, name="conv_proj")(
+                residual
+            )
             residual = self.norm(name="norm_proj")(residual)
 
         if self.stochastic_depth_drop_rate > 0.0:
