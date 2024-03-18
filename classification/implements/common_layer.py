@@ -180,20 +180,22 @@ class BottleneckConvNeXtBlock(nn.Module):
     @nn.compact
     def __call__(self, x):
         residual = x
-        y = self.conv(self.features * 4, (1, 1))(x)
-        y = self.norm()(y)
-        y = self.act(y)
         # Depthwise
-        dw_filters = y.shape[-1]
+        dw_filters = x.shape[-1]
         y = self.conv(
             features=dw_filters,
             kernel_size=(3, 3),
             strides=self.strides,
             padding="SAME",
             feature_group_count=dw_filters,
-        )(y)
+        )(x)
         y = self.norm()(y)
         y = self.act(y)
+
+        y = self.conv(self.features * 4, (1, 1))(y)
+        y = self.norm()(y)
+        y = self.act(y)
+
         y = self.conv(self.features, (1, 1))(y)
         y = self.norm(scale_init=nn.initializers.zeros_init())(y)
 
