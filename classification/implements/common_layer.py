@@ -173,7 +173,7 @@ class BottleneckConvNeXtBlock(nn.Module):
     conv: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef
-    act: ModuleDef
+    act: Callable
     strides: Optional[Tuple[int, int]] = (1, 1)
     stochastic_depth_drop_rate: Optional[float] = 0.0
     kernel_size: Optional[Tuple[int, int]] = (7, 7)
