@@ -40,15 +40,13 @@ class ConvNeXtBackbone(nn.Module):
     def __call__(self, x):
         x = self.conv(
             64,
-            kernel_size=(7, 7),
-            strides=(2, 2),
-            padding=[(3, 3), (3, 3)],
+            kernel_size=(4, 4),
+            strides=(4, 4),
             name="conv_init",
         )(x)
 
         x = self.norm(name="bn_init")(x)
         x = self.act(x)
-        x = nn.max_pool(x, window_shape=(3, 3), strides=(2, 2), padding="SAME")
 
         for i, block_size in enumerate(self.stage_sizes):
             stochastic_depth_drop_rate = get_stochastic_depth_rate(
