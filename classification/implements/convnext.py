@@ -8,7 +8,7 @@
 """
 
 from functools import partial
-from typing import Any, Callable, Sequence, Optional, Tuple
+from typing import Any, Sequence, Optional, Tuple
 from .stochastic_depth import get_stochastic_depth_rate, StochasticDepth
 
 from flax import linen as nn
@@ -33,7 +33,7 @@ class ConvNeXtBackbone(nn.Module):
     conv: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef
-    act: Callable
+    act: ModuleDef
     kernel_size: Tuple[int, int]
     init_stochastic_depth_rate: Optional[float] = 0.0
 
@@ -92,12 +92,16 @@ class ConvNeXt(nn.Module):
             dtype=self.dtype,
             axis_name="batch",
         )
+        act = partial(
+            nn.activation.gelu,
+            approximate=False
+        )
         stochastic_depth = partial(StochasticDepth, deterministic=not train)
         backbone = partial(
             ConvNeXtBackbone,
             conv=conv,
             norm=norm,
-            act=nn.relu,
+            act=act,
             kernel_size=self.kernel_size,
             stochastic_depth=stochastic_depth,
             init_stochastic_depth_rate=self.init_stochastic_depth_rate,
