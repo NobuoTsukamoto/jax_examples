@@ -166,6 +166,50 @@ class BottleneckResNetBlock(nn.Module):
         return self.act(residual + y)
 
 
+class BottleneckConvNeXtBlock(nn.Module):
+    """Bottleneck ConvNeXt block."""
+
+    features: int
+    conv: ModuleDef
+    norm: ModuleDef
+    stochastic_depth: ModuleDef
+    act: Callable
+    strides: Optional[Tuple[int, int]] = (1, 1)
+    stochastic_depth_drop_rate: Optional[float] = 0.0
+
+    @nn.compact
+    def __call__(self, x):
+        residual = x
+        y = self.conv(self.features, (1, 1))(x)
+        y = self.norm()(y)
+        y = self.act(y)
+        # Depthwise
+        dw_filters = y.shape[-1]
+        y = self.conv(
+            features=dw_filters,
+            kernel_size=(3, 3),
+            strides=self.strides,
+            padding="SAME",
+            feature_group_count=dw_filters,
+        )(y)
+        y = self.norm()(y)
+        y = self.act(y)
+        y = self.conv(self.features * 4, (1, 1))(y)
+        y = self.norm(scale_init=nn.initializers.zeros_init())(y)
+
+        if residual.shape != y.shape:
+            residual = self.conv(
+                self.features * 4, (1, 1), self.strides, name="conv_proj"
+            )(residual)
+            residual = self.norm(name="norm_proj")(residual)
+
+        if self.stochastic_depth_drop_rate > 0.0:
+            y = self.stochastic_depth(
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+            )(y)
+        return self.act(residual + y)
+
+
 class InvertedResBlock(nn.Module):
     """Inverted ResNet block."""
 
