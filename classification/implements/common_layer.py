@@ -191,7 +191,6 @@ class BottleneckConvNeXtBlock(nn.Module):
             feature_group_count=dw_filters,
         )(x)
         y = self.norm()(y)
-        y = self.act(y)
 
         y = self.conv(self.features * 4, (1, 1))(y)
         y = self.norm()(y)
@@ -210,7 +209,7 @@ class BottleneckConvNeXtBlock(nn.Module):
             y = self.stochastic_depth(
                 stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
             )(y)
-        return self.act(residual + y)
+        return residual + y
 
 
 class InvertedResBlock(nn.Module):

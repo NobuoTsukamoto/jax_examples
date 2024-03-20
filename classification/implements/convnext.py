@@ -47,7 +47,6 @@ class ConvNeXtBackbone(nn.Module):
         )(x)
 
         x = self.norm(name="bn_init")(x)
-        x = self.act(x)
 
         for i, block_size in enumerate(self.stage_sizes):
             stochastic_depth_drop_rate = get_stochastic_depth_rate(
