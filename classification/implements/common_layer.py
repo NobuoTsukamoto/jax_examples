@@ -176,6 +176,7 @@ class BottleneckConvNeXtBlock(nn.Module):
     act: Callable
     strides: Optional[Tuple[int, int]] = (1, 1)
     stochastic_depth_drop_rate: Optional[float] = 0.0
+    kernel_size: Optional[Tuple[int, int]] = (7, 7)
 
     @nn.compact
     def __call__(self, x):
@@ -184,7 +185,7 @@ class BottleneckConvNeXtBlock(nn.Module):
         dw_filters = x.shape[-1]
         y = self.conv(
             features=dw_filters,
-            kernel_size=(3, 3),
+            kernel_size=self.kernel_size,
             strides=self.strides,
             padding="SAME",
             feature_group_count=dw_filters,
