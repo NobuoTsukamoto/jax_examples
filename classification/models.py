@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -13,6 +13,7 @@ from implements.mobilenet_v2 import MobileNetV2
 from implements.mobilenet_v3 import MobileNetV3, Large, Small
 from implements.resnet_v2 import ResNetV2, ResNet50V2_layer
 from implements.resnet_v1 import ResNet
+from implements.convnext import ConvNeXt
 
 from implements.common_layer import ResNetBlock, BottleneckResNetBlock
 
@@ -49,3 +50,11 @@ ResNet50 = partial(
 
 # ResNet50 v2
 ResNet50V2 = partial(ResNetV2, layers=ResNet50V2_layer)
+
+# ConvNeXt V1
+ConvNeXt_T = partial(
+    ConvNeXt,
+    stage_sizes=[3, 3, 9, 3],
+    num_filters=[64, 128, 256, 512],
+    block_cls=BottleneckResNetBlock,
+)
