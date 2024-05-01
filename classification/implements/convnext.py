@@ -40,7 +40,7 @@ class ConvNeXtBackbone(nn.Module):
     @nn.compact
     def __call__(self, x):
         x = self.conv(
-            64,
+            96,
             kernel_size=(4, 4),
             strides=(4, 4),
             name="conv_init",
@@ -53,11 +53,22 @@ class ConvNeXtBackbone(nn.Module):
                 self.init_stochastic_depth_rate, i + 2, 5
             )
 
-            for j in range(block_size):
-                strides = (2, 2) if i > 0 and j == 0 else (1, 1)
+            if i > 0:
+                # layer norm
+                x = self.norm()(x)
+                
+                # downsampling
+                x = self.conv(
+                    self.num_filters[i],
+                    kernel_size=(2, 2),
+                    strides=(2, 2),
+                )(x)
+
+            # stage
+            for _ in range(block_size):
                 x = self.block_cls(
                     self.num_filters[i],
-                    strides=strides,
+                    strides=(1, 1),
                     conv=self.conv,
                     norm=self.norm,
                     act=self.act,
