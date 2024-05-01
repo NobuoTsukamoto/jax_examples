@@ -10,6 +10,7 @@
 import jax
 import tensorflow as tf
 import train
+import train_non_batchnorm
 from absl import app, flags, logging
 from clu import platform
 from ml_collections import config_flags
@@ -21,6 +22,7 @@ config_flags.DEFINE_config_file(
     "File path to the training hyperparameter configuration.",
     lock_config=True,
 )
+flags.DEFINE_bool("non_batchnorm", False, "Use LayerNorm or GroupNorm.")
 
 FLAGS = flags.FLAGS
 
@@ -43,7 +45,10 @@ def main(argv):
         platform.ArtifactType.DIRECTORY, FLAGS.workdir, "workdir"
     )
 
-    train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
+    if FLAGS.non_batchnorm:
+        train_non_batchnorm.train_and_evaluate(FLAGS.config, FLAGS.workdir)
+    else:
+        train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
 
 
 if __name__ == "__main__":
