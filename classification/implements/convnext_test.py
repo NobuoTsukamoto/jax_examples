@@ -50,7 +50,7 @@ class ConvNeXtTest(parameterized.TestCase):
         model_def = ConvNeXt_T(num_classes=1000, dtype=jnp.float32)
         variables = model_def.init(rng, jnp.ones((1, 224, 224, 3), jnp.float32))
 
-        self.assertLen(variables, 2)
+        self.assertLen(variables, 1)
 
         print(parameter_overview.get_parameter_overview(variables))
 
