@@ -55,7 +55,10 @@ def initialized(key, image_size, model):
         return model.init(*args)
 
     variables = init(key, jnp.ones(input_shape, model.dtype))
-    return variables["params"], variables["batch_stats"]
+    params = variables["params"]
+    batch_stats = variables["batch_stats"] if "batch_stats" in variables else None
+
+    return params, batch_stats
 
 
 def cross_entropy_loss(logits, labels, num_classes, label_smoothing=0.0):
@@ -113,6 +116,7 @@ def train_step(
     label_smoothing=0.0,
     dropout_rng=None,
     stochastic_depth_rng=None,
+    with_batchnorm=True
 ):
     """Perform a single training step."""
 
@@ -121,7 +125,7 @@ def train_step(
         stochastic_depth_rng
     )
 
-    def loss_fn(params):
+    def loss_with_batchnorm_fn(params):
         """loss function used for training."""
         logits, new_model_state = state.apply_fn(
             {"params": params, "batch_stats": state.batch_stats},
@@ -137,9 +141,25 @@ def train_step(
         loss = loss + weight_penalty
         return loss, (new_model_state, logits)
 
+    def loss_without_batchnorm_fn(params):
+        """loss function used for training."""
+        logits = state.apply_fn(
+            {"params": params},
+            batch["image"],
+            rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
+        )
+        loss = cross_entropy_loss(logits, batch["label"], num_classes, label_smoothing)
+        weight_penalty_params = jax.tree_util.tree_leaves(params)
+        weight_decay = 0.0001
+        weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
+        weight_penalty = weight_decay * 0.5 * weight_l2
+        loss = loss + weight_penalty
+        return loss, logits
+
     step = state.step
     dynamic_scale = state.dynamic_scale
     lr = learning_rate_fn(step)
+    loss_fn =  loss_with_batchnorm_fn if with_batchnorm else loss_without_batchnorm_fn
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
@@ -150,13 +170,24 @@ def train_step(
         aux, grads = grad_fn(state.params)
         # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
         grads = lax.pmean(grads, axis_name="batch")
-    new_model_state, logits = aux[1]
+
+    if with_batchnorm:
+        new_model_state, logits = aux[1]
+    else:
+        logits = aux[1]
+
     metrics = compute_metrics(logits, batch["label"], num_classes, label_smoothing)
     metrics["learning_rate"] = lr
 
-    new_state = state.apply_gradients(
-        grads=grads, batch_stats=new_model_state["batch_stats"]
-    )
+    if with_batchnorm:
+        new_state = state.apply_gradients(
+            grads=grads, batch_stats=new_model_state["batch_stats"]
+        )
+    else:
+        new_state = state.apply_gradients(
+            grads=grads
+        )
+
     if dynamic_scale:
         # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
         # params should be restored (= skip this step).
@@ -176,8 +207,12 @@ def train_step(
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
 
-def eval_step(state, batch, num_classes):
-    variables = {"params": state.params, "batch_stats": state.batch_stats}
+def eval_step(state, batch, num_classes, with_batchnorm):
+    if with_batchnorm:
+        variables = {"params": state.params, "batch_stats": state.batch_stats}
+    else:
+        variables = {"params": state.params}
+
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     return compute_metrics(logits, batch["label"], num_classes)
 
@@ -210,8 +245,12 @@ def create_input_iter(dataset_builder, batch_size, dtype, train, config):
     return it
 
 
-class TrainState(train_state.TrainState):
+class TrainStateWithBatchNorm(train_state.TrainState):
     batch_stats: Any
+    dynamic_scale: dynamic_scale_lib.DynamicScale
+
+
+class TrainStateWithoutBatchNorm(train_state.TrainState):
     dynamic_scale: dynamic_scale_lib.DynamicScale
 
 
@@ -289,23 +328,32 @@ def create_train_state(
             nesterov=True,
         )
 
-    state = TrainState.create(
-        apply_fn=model.apply,
-        params=params,
-        tx=tx,
-        batch_stats=batch_stats,
-        dynamic_scale=dynamic_scale,
-    )
-    return state
+    if batch_stats is not None:
+        state = TrainStateWithBatchNorm.create(
+            apply_fn=model.apply,
+            params=params,
+            tx=tx,
+            batch_stats=batch_stats,
+            dynamic_scale=dynamic_scale,
+        )
+        with_batchnorm = True
+    else:
+        state = TrainStateWithoutBatchNorm.create(
+            apply_fn=model.apply,
+            params=params,
+            tx=tx,
+            dynamic_scale=dynamic_scale,
+        )
+        with_batchnorm = False
+        
+    return state, with_batchnorm
 
 
-def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> TrainState:
+def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     """Execute model training and evaluation loop.
     Args:
         config: Hyperparameter configuration for training and evaluation.
         workdir: Directory where the tensorboard summaries are written to.
-    Returns:
-        Final TrainState.
     """
 
     writer = metric_writers.create_default_writer(
@@ -374,7 +422,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         checkpoint_manager_options,
     )
 
-    state = create_train_state(rngs, config, model, config.image_size, learning_rate_fn)
+    state, with_batchnorm = create_train_state(rngs, config, model, config.image_size, learning_rate_fn)
     state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
@@ -386,11 +434,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             learning_rate_fn=learning_rate_fn,
             num_classes=num_classes,
             label_smoothing=config.label_smoothing,
+            with_batchnorm=with_batchnorm
         ),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
-        functools.partial(eval_step, num_classes=num_classes),
+        functools.partial(eval_step, num_classes=num_classes, with_batchnorm=with_batchnorm),
         axis_name="batch",
     )
 
@@ -438,8 +487,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             epoch = step // steps_per_epoch
             eval_metrics = []
 
-            # sync batch statistics across replicas
-            state = sync_batch_stats(state)
+            if with_batchnorm:
+                # sync batch statistics across replicas
+                state = sync_batch_stats(state)
+
             for _ in range(steps_per_eval):
                 eval_batch = next(eval_iter)
                 metrics = p_eval_step(state, eval_batch)
@@ -458,7 +509,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            state = sync_batch_stats(state)
+            if with_batchnorm:
+                state = sync_batch_stats(state)
             save_checkpoint(checkpoint_manager, state)
 
     # Wait until computations are done before exiting

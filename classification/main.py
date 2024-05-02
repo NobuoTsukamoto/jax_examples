@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -10,7 +10,6 @@
 import jax
 import tensorflow as tf
 import train
-import train_non_batchnorm
 from absl import app, flags, logging
 from clu import platform
 from ml_collections import config_flags
@@ -45,10 +44,7 @@ def main(argv):
         platform.ArtifactType.DIRECTORY, FLAGS.workdir, "workdir"
     )
 
-    if FLAGS.non_batchnorm:
-        train_non_batchnorm.train_and_evaluate(FLAGS.config, FLAGS.workdir)
-    else:
-        train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
+    train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
 
 
 if __name__ == "__main__":
