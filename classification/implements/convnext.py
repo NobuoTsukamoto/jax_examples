@@ -65,7 +65,7 @@ class ConvNeXtBackbone(nn.Module):
                 )(x)
 
             # stage
-            for _ in range(block_size):
+            for j in range(block_size):
                 x = self.block_cls(
                     self.num_filters[i],
                     strides=(1, 1),
@@ -74,7 +74,8 @@ class ConvNeXtBackbone(nn.Module):
                     act=self.act,
                     stochastic_depth=self.stochastic_depth,
                     stochastic_depth_drop_rate=stochastic_depth_drop_rate,
-                    kernel_size=self.kernel_size
+                    kernel_size=self.kernel_size,
+                    name="BottleneckConvNeXtBlock_{:02}_{:02}".format(i + 1, j + 1)
                 )(x)
 
         return x
@@ -120,6 +121,8 @@ class ConvNeXt(nn.Module):
         )(x)
 
         x = jnp.mean(x, axis=(1, 2))
+        x = norm()(x)
         x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
+
         x = jnp.asarray(x, self.dtype)
         return x
