@@ -14,7 +14,7 @@ from clu import parameter_overview
 from jax import numpy as jnp
 from convnext import ConvNeXt
 import flax.linen as nn
-from common_layer import BottleneckResNetBlock, BottleneckConvNeXtBlock
+from common_layer import BottleneckConvNeXtBlock
 
 """Tests for convnext."""
 
@@ -41,7 +41,7 @@ class ConvNeXtTest(parameterized.TestCase):
             model_def, rng, compute_flops=True, compute_vjp_flops=True
         )
         x = jnp.ones((1, 224, 224, 3), jnp.float32)
-        
+
         print(tabulate_fn(x, train=False))
 
     def test_convnext_t_model2(self):

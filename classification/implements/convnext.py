@@ -10,6 +10,7 @@
 from functools import partial
 from typing import Any, Sequence, Optional, Tuple
 from .stochastic_depth import get_stochastic_depth_rate, StochasticDepth
+from .layer_scale import LayerScale
 
 from flax import linen as nn
 import jax.numpy as jnp
@@ -33,6 +34,7 @@ class ConvNeXtBackbone(nn.Module):
     conv: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef
+    layer_scale: ModuleDef
     act: ModuleDef
     kernel_size: Tuple[int, int]
     init_stochastic_depth_rate: Optional[float] = 0.0
@@ -56,7 +58,7 @@ class ConvNeXtBackbone(nn.Module):
             if i > 0:
                 # layer norm
                 x = self.norm()(x)
-                
+
                 # downsampling
                 x = self.conv(
                     self.num_filters[i],
@@ -75,7 +77,8 @@ class ConvNeXtBackbone(nn.Module):
                     stochastic_depth=self.stochastic_depth,
                     stochastic_depth_drop_rate=stochastic_depth_drop_rate,
                     kernel_size=self.kernel_size,
-                    name="BottleneckConvNeXtBlock_{:02}_{:02}".format(i + 1, j + 1)
+                    layer_scale=self.layer_scale,
+                    name="BottleneckConvNeXtBlock_{:02}_{:02}".format(i + 1, j + 1),
                 )(x)
 
         return x
@@ -100,11 +103,9 @@ class ConvNeXt(nn.Module):
             epsilon=1e-6,
             dtype=self.dtype,
         )
-        act = partial(
-            nn.activation.gelu,
-            approximate=False
-        )
+        act = partial(nn.activation.gelu, approximate=False)
         stochastic_depth = partial(StochasticDepth, deterministic=not train)
+        layer_scale = partial(LayerScale, dtype=self.dtype)
         backbone = partial(
             ConvNeXtBackbone,
             conv=conv,
@@ -113,6 +114,7 @@ class ConvNeXt(nn.Module):
             kernel_size=self.kernel_size,
             stochastic_depth=stochastic_depth,
             init_stochastic_depth_rate=self.init_stochastic_depth_rate,
+            layer_scale=layer_scale,
         )
         x = backbone(
             stage_sizes=self.stage_sizes,

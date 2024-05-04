@@ -173,6 +173,7 @@ class BottleneckConvNeXtBlock(nn.Module):
     conv: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef
+    layer_scale: ModuleDef
     act: ModuleDef
     strides: Optional[Tuple[int, int]] = (1, 1)
     stochastic_depth_drop_rate: Optional[float] = 0.0
@@ -202,6 +203,7 @@ class BottleneckConvNeXtBlock(nn.Module):
                 residual
             )
 
+        y = self.layer_scale(projection_dim=self.features)(y)
         if self.stochastic_depth_drop_rate > 0.0:
             y = self.stochastic_depth(
                 stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
