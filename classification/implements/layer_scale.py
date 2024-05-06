@@ -8,6 +8,7 @@
 """
 
 from typing import Any
+from functools import partial
 
 import jax.numpy as jnp
 from flax import linen as nn
@@ -29,14 +30,12 @@ class LayerScale(nn.Module):
     dtype: Any = jnp.float32
 
     def setup(self):
-        self.scale = (
-            self.param(
-                "scale",
-                nn.initializers.ones,
-                (self.projection_dim,),
-                self.dtype,
-            )
-            * self.init_values
+        initializer = nn.initializers.constant(value=self.init_values, dtype=self.dtype)
+        self.scale = self.param(
+            "scale",
+            initializer,
+            (self.projection_dim,),
+            self.dtype,
         )
 
     @nn.compact

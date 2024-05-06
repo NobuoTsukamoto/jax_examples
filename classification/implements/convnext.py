@@ -14,6 +14,7 @@ from .layer_scale import LayerScale
 
 from flax import linen as nn
 import jax.numpy as jnp
+import numpy as np
 
 ModuleDef = Any
 
@@ -33,11 +34,12 @@ class ConvNeXtBackbone(nn.Module):
     block_cls: ModuleDef
     conv: ModuleDef
     norm: ModuleDef
+    batch_norm: ModuleDef
     stochastic_depth: ModuleDef
+    stochastic_depth_rate: Sequence[float]
     layer_scale: ModuleDef
     act: ModuleDef
     kernel_size: Tuple[int, int]
-    init_stochastic_depth_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, x):
@@ -48,13 +50,10 @@ class ConvNeXtBackbone(nn.Module):
             name="conv_init",
         )(x)
 
-        x = self.norm(name="ln_init")(x)
+        x = self.batch_norm(name="ln_init")(x)
 
+        num_stage = 0
         for i, block_size in enumerate(self.stage_sizes):
-            stochastic_depth_drop_rate = get_stochastic_depth_rate(
-                self.init_stochastic_depth_rate, i + 2, 5
-            )
-
             if i > 0:
                 # layer norm
                 x = self.norm()(x)
@@ -75,11 +74,12 @@ class ConvNeXtBackbone(nn.Module):
                     norm=self.norm,
                     act=self.act,
                     stochastic_depth=self.stochastic_depth,
-                    stochastic_depth_drop_rate=stochastic_depth_drop_rate,
+                    stochastic_depth_drop_rate=self.stochastic_depth_rate[num_stage],
                     kernel_size=self.kernel_size,
                     layer_scale=self.layer_scale,
                     name="BottleneckConvNeXtBlock_{:02}_{:02}".format(i + 1, j + 1),
                 )(x)
+                num_stage += 1
 
         return x
 
@@ -97,11 +97,26 @@ class ConvNeXt(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
+        stochastic_depth_rate = [
+            x.item()
+            for x in np.linspace(
+                0, self.init_stochastic_depth_rate, sum(self.stage_sizes)
+            )
+        ]
         conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        batch_norm = partial(
+            nn.BatchNorm,
+            use_running_average=not train,
+            momentum=0.9,
+            epsilon=1e-5,
+            dtype=self.dtype,
+            axis_name="batch",
+        )
         norm = partial(
             nn.LayerNorm,
             epsilon=1e-6,
             dtype=self.dtype,
+            reduction_axes=-1,
         )
         act = partial(nn.activation.gelu, approximate=False)
         stochastic_depth = partial(StochasticDepth, deterministic=not train)
@@ -113,9 +128,11 @@ class ConvNeXt(nn.Module):
             act=act,
             kernel_size=self.kernel_size,
             stochastic_depth=stochastic_depth,
-            init_stochastic_depth_rate=self.init_stochastic_depth_rate,
+            stochastic_depth_rate=stochastic_depth_rate,
             layer_scale=layer_scale,
+            batch_norm=batch_norm,
         )
+
         x = backbone(
             stage_sizes=self.stage_sizes,
             num_filters=self.num_filters,

@@ -39,6 +39,6 @@ def get_config():
     config.randaug_prob_to_apply = None
     config.randaug_exclude_ops = ["Cutout"]
 
-    config.init_stochastic_depth_rate = 0.1
+    config.init_stochastic_depth_rate = 0.5
 
     return config
