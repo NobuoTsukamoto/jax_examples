@@ -116,7 +116,7 @@ def train_step(
     label_smoothing=0.0,
     dropout_rng=None,
     stochastic_depth_rng=None,
-    with_batchnorm=True
+    with_batchnorm=True,
 ):
     """Perform a single training step."""
 
@@ -159,7 +159,7 @@ def train_step(
     step = state.step
     dynamic_scale = state.dynamic_scale
     lr = learning_rate_fn(step)
-    loss_fn =  loss_with_batchnorm_fn if with_batchnorm else loss_without_batchnorm_fn
+    loss_fn = loss_with_batchnorm_fn if with_batchnorm else loss_without_batchnorm_fn
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
@@ -184,9 +184,7 @@ def train_step(
             grads=grads, batch_stats=new_model_state["batch_stats"]
         )
     else:
-        new_state = state.apply_gradients(
-            grads=grads
-        )
+        new_state = state.apply_gradients(grads=grads)
 
     if dynamic_scale:
         # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
@@ -345,7 +343,7 @@ def create_train_state(
             dynamic_scale=dynamic_scale,
         )
         with_batchnorm = False
-        
+
     return state, with_batchnorm
 
 
@@ -422,7 +420,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         checkpoint_manager_options,
     )
 
-    state, with_batchnorm = create_train_state(rngs, config, model, config.image_size, learning_rate_fn)
+    state, with_batchnorm = create_train_state(
+        rngs, config, model, config.image_size, learning_rate_fn
+    )
     state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
@@ -434,12 +434,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             learning_rate_fn=learning_rate_fn,
             num_classes=num_classes,
             label_smoothing=config.label_smoothing,
-            with_batchnorm=with_batchnorm
+            with_batchnorm=with_batchnorm,
         ),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
-        functools.partial(eval_step, num_classes=num_classes, with_batchnorm=with_batchnorm),
+        functools.partial(
+            eval_step, num_classes=num_classes, with_batchnorm=with_batchnorm
+        ),
         axis_name="batch",
     )
 
