@@ -14,6 +14,7 @@ import jax.numpy as jnp
 import jax.nn as jnn
 from jax import lax, random
 from flax import linen as nn
+import jax.numpy as jnp
 
 ModuleDef = Any
 
@@ -193,15 +194,12 @@ class BottleneckConvNeXtBlock(nn.Module):
         )(x)
         y = self.norm()(y)
 
-        y = self.conv(self.features * 4, (1, 1))(y)
+        # y = self.conv(self.features * 4, (1, 1))(y)
+        y = nn.Dense(self.features * 4, dtype=jnp.float32)(y)
         y = self.act(y)
 
-        y = self.conv(self.features, (1, 1))(y)
-
-        if residual.shape != y.shape:
-            residual = self.conv(self.features, (1, 1), self.strides, name="conv_proj")(
-                residual
-            )
+        # y = self.conv(self.features, (1, 1))(y)
+        y = nn.Dense(self.features, dtype=jnp.float32)(y)
 
         y = self.layer_scale(projection_dim=self.features)(y)
         if self.stochastic_depth_drop_rate > 0.0:
