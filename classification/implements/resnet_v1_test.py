@@ -75,6 +75,30 @@ class ResNetTest(parameterized.TestCase):
         # Total: 23,581,642
         print(parameter_overview.get_parameter_overview(variables))
 
+    def test_resnet_v1_50_with_stochastic_depth_model(self):
+        """Tests ResNet50 model definition and output (variables)."""
+        rngs = {
+            "params": jax.random.PRNGKey(0),
+            "stochastic_depth": jax.random.PRNGKey(1),
+        }
+        model_def = ResNet50(
+            num_classes=10, dtype=jnp.float32, init_stochastic_depth_rate=0.2
+        )
+        variables = model_def.init(rngs, jnp.ones((1, 224, 224, 3), jnp.float32))
+
+        self.assertLen(variables, 2)
+        # ResNet 18 model will create parameters for the following layers:
+        #   layer1 : 1
+        #   layer2 : 3
+        #   layer3 : 4
+        #   layer4 : 6
+        #   layer4 : 3
+        #   Followed by a Dense layer = 2
+        # self.assertLen(variables["params"], 19)
+
+        # Total: 23,581,642
+        print(parameter_overview.get_parameter_overview(variables))
+
 
 if __name__ == "__main__":
     absltest.main()

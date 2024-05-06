@@ -28,6 +28,7 @@ def get_config():
     config.warmup_epochs = 5.0
     config.momentum = 0.9
     config.batch_size = 64
+    config.label_smoothing = 0.0
 
     config.num_epochs = 100.0
     config.log_every_steps = 100
@@ -47,9 +48,10 @@ def get_config():
 
     # randomarug
     config.randaug_num_layers = 2
-    config.randaug_magnitude = 10.0
+    config.randaug_magnitude = 9
     config.randaug_cutout_const = 40.0
     config.randaug_translate_const = 0.0
+    config.randaug_magnitude_std = 0.0
     config.randaug_prob_to_apply = None
     config.randaug_exclude_ops = ["Cutout"]
 
@@ -77,6 +79,10 @@ def get_config():
     config.center_crop_fraction = 0.875
 
     config.three_augment = False
+
+    config.init_stochastic_depth_rate = 0.0
+
+    config.seed = 42
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.

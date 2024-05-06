@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -15,7 +15,7 @@ def get_config():
     config = default_lib.get_config()
 
     # As defined in the `models` module.
-    config.model = "ResNet50"
+    config.model = "ConvNeXt_T"
 
     config.optimizer = "adamw"
     config.learning_rate = 0.004
@@ -39,6 +39,6 @@ def get_config():
     config.randaug_prob_to_apply = None
     config.randaug_exclude_ops = ["Cutout"]
 
-    config.init_stochastic_depth_rate = 0.1
+    config.init_stochastic_depth_rate = 0.5
 
     return config
