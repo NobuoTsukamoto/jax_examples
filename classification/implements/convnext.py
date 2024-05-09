@@ -34,7 +34,6 @@ class ConvNeXtBackbone(nn.Module):
     block_cls: ModuleDef
     conv: ModuleDef
     norm: ModuleDef
-    batch_norm: ModuleDef
     stochastic_depth: ModuleDef
     stochastic_depth_rate: Sequence[float]
     layer_scale: ModuleDef
@@ -49,8 +48,7 @@ class ConvNeXtBackbone(nn.Module):
             strides=(4, 4),
             name="conv_init",
         )(x)
-
-        x = self.batch_norm(name="ln_init")(x)
+        x = self.norm(name="ln_init")(x)
 
         num_stage = 0
         for i, block_size in enumerate(self.stage_sizes):
@@ -103,20 +101,13 @@ class ConvNeXt(nn.Module):
                 0, self.init_stochastic_depth_rate, sum(self.stage_sizes)
             )
         ]
+        print(stochastic_depth_rate)
+
         conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
-        batch_norm = partial(
-            nn.BatchNorm,
-            use_running_average=not train,
-            momentum=0.9,
-            epsilon=1e-5,
-            dtype=self.dtype,
-            axis_name="batch",
-        )
         norm = partial(
             nn.LayerNorm,
             epsilon=1e-6,
             dtype=self.dtype,
-            reduction_axes=-1,
         )
         act = partial(nn.activation.gelu, approximate=False)
         stochastic_depth = partial(StochasticDepth, deterministic=not train)
@@ -130,7 +121,6 @@ class ConvNeXt(nn.Module):
             stochastic_depth=stochastic_depth,
             stochastic_depth_rate=stochastic_depth_rate,
             layer_scale=layer_scale,
-            batch_norm=batch_norm,
         )
 
         x = backbone(
