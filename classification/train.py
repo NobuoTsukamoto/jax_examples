@@ -117,6 +117,7 @@ def train_step(
     dropout_rng=None,
     stochastic_depth_rng=None,
     with_batchnorm=True,
+    l2_weight_decay=0.0001
 ):
     """Perform a single training step."""
 
@@ -134,11 +135,11 @@ def train_step(
             rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
         )
         loss = cross_entropy_loss(logits, batch["label"], num_classes, label_smoothing)
-        weight_penalty_params = jax.tree_util.tree_leaves(params)
-        weight_decay = 0.0001
-        weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
-        weight_penalty = weight_decay * 0.5 * weight_l2
-        loss = loss + weight_penalty
+        if l2_weight_decay > 0.0:
+            weight_penalty_params = jax.tree_util.tree_leaves(params)
+            weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
+            weight_penalty = weight_decay * 0.5 * weight_l2
+            loss = loss + weight_penalty
         return loss, (new_model_state, logits)
 
     def loss_without_batchnorm_fn(params):
@@ -149,11 +150,11 @@ def train_step(
             rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
         )
         loss = cross_entropy_loss(logits, batch["label"], num_classes, label_smoothing)
-        weight_penalty_params = jax.tree_util.tree_leaves(params)
-        weight_decay = 0.0001
-        weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
-        weight_penalty = weight_decay * 0.5 * weight_l2
-        loss = loss + weight_penalty
+        if l2_weight_decay > 0.0:
+            weight_penalty_params = jax.tree_util.tree_leaves(params)
+            weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
+            weight_penalty = weight_decay * 0.5 * weight_l2
+            loss = loss + weight_penalty
         return loss, logits
 
     step = state.step

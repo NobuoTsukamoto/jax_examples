@@ -24,6 +24,7 @@ def get_config():
     config.momentum = 0.9
     config.batch_size = 64
     config.label_smoothing = 0.1
+    config.l2_weight_decay = 0.0
 
     config.num_epochs = 300
     config.aug_type = "randaug"
