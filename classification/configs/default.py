@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -29,13 +29,13 @@ def get_config():
     config.momentum = 0.9
     config.batch_size = 64
     config.label_smoothing = 0.0
+    config.l2_weight_decay = 0.0001
 
     config.num_epochs = 100.0
     config.log_every_steps = 100
 
     config.cache = False
     config.half_precision = False
-
 
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
