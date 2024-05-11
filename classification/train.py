@@ -26,7 +26,7 @@ from flax.training import common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
 from flax.training import train_state
 from flax.training import orbax_utils
-from jax import lax, random
+from jax import lax
 
 """ Training Image classfication model.
 
@@ -117,7 +117,7 @@ def train_step(
     dropout_rng=None,
     stochastic_depth_rng=None,
     with_batchnorm=True,
-    l2_weight_decay=0.0001
+    l2_weight_decay=0.0001,
 ):
     """Perform a single training step."""
 
@@ -126,41 +126,42 @@ def train_step(
         stochastic_depth_rng
     )
 
-    def loss_with_batchnorm_fn(params):
+    def loss_fn(params):
         """loss function used for training."""
-        logits, new_model_state = state.apply_fn(
-            {"params": params, "batch_stats": state.batch_stats},
-            batch["image"],
-            mutable=["batch_stats"],
-            rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
-        )
-        loss = cross_entropy_loss(logits, batch["label"], num_classes, label_smoothing)
-        if l2_weight_decay > 0.0:
-            weight_penalty_params = jax.tree_util.tree_leaves(params)
-            weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
-            weight_penalty = weight_decay * 0.5 * weight_l2
-            loss = loss + weight_penalty
-        return loss, (new_model_state, logits)
+        if with_batchnorm:
+            logits, new_model_state = state.apply_fn(
+                {"params": params, "batch_stats": state.batch_stats},
+                batch["image"],
+                mutable=["batch_stats"],
+                rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
+            )
 
-    def loss_without_batchnorm_fn(params):
-        """loss function used for training."""
-        logits = state.apply_fn(
-            {"params": params},
-            batch["image"],
-            rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
-        )
+        else:
+            logits = state.apply_fn(
+                {"params": params},
+                batch["image"],
+                rngs={"dropout": dropout_rng, "stochastic_depth": stochastic_depth_rng},
+            )
+
         loss = cross_entropy_loss(logits, batch["label"], num_classes, label_smoothing)
         if l2_weight_decay > 0.0:
-            weight_penalty_params = jax.tree_util.tree_leaves(params)
-            weight_l2 = sum([jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1])
-            weight_penalty = weight_decay * 0.5 * weight_l2
+            weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
+            weight_l2 = sum(
+                jnp.sum(x[1] ** 2)
+                for x in weight_penalty_params
+                if x[1].ndim > 1 and "DepthwiseSeparable" not in x[0][0].key
+            )
+            weight_penalty = l2_weight_decay * 0.5 * weight_l2
             loss = loss + weight_penalty
-        return loss, logits
+
+        if with_batchnorm:
+            return loss, (new_model_state, logits)
+        else:
+            return loss, logits
 
     step = state.step
     dynamic_scale = state.dynamic_scale
     lr = learning_rate_fn(step)
-    loss_fn = loss_with_batchnorm_fn if with_batchnorm else loss_without_batchnorm_fn
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")

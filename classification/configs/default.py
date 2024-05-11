@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -36,7 +36,6 @@ def get_config():
 
     config.cache = False
     config.half_precision = False
-
 
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
