@@ -63,3 +63,17 @@ ConvNeXt_T = partial(
     kernel_size=(7, 7),
     block_cls=BottleneckConvNeXtBlock,
 )
+ConvNeXt_S = partial(
+    ConvNeXt,
+    stage_sizes=[3, 3, 27, 3],
+    num_filters=[96, 192, 384, 768],
+    kernel_size=(7, 7),
+    block_cls=BottleneckConvNeXtBlock,
+)
+ConvNeXt_B = partial(
+    ConvNeXt,
+    stage_sizes=[3, 3, 27, 3],
+    num_filters=[128, 256, 512, 1024],
+    kernel_size=(7, 7),
+    block_cls=BottleneckConvNeXtBlock,
+)
