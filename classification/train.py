@@ -437,6 +437,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             num_classes=num_classes,
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
+            l2_weight_decay=config.l2_weight_decay,
         ),
         axis_name="batch",
     )
