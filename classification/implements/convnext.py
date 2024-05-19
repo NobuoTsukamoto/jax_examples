@@ -33,6 +33,7 @@ class ConvNeXtBackbone(nn.Module):
     num_filters: Sequence[int]
     block_cls: ModuleDef
     conv: ModuleDef
+    linear: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef
     stochastic_depth_rate: Sequence[float]
@@ -69,6 +70,7 @@ class ConvNeXtBackbone(nn.Module):
                     self.num_filters[i],
                     strides=(1, 1),
                     conv=self.conv,
+                    linear=self.linear,
                     norm=self.norm,
                     act=self.act,
                     stochastic_depth=self.stochastic_depth,
@@ -104,6 +106,7 @@ class ConvNeXt(nn.Module):
         print(stochastic_depth_rate)
 
         conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        linear = partial(nn.Dense, use_bias=False, dtype=self.dtype)
         norm = partial(
             nn.LayerNorm,
             epsilon=1e-6,
@@ -115,6 +118,7 @@ class ConvNeXt(nn.Module):
         backbone = partial(
             ConvNeXtBackbone,
             conv=conv,
+            linear=linear,
             norm=norm,
             act=act,
             kernel_size=self.kernel_size,
