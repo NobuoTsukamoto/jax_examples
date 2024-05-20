@@ -24,6 +24,61 @@ ModuleDef = Any
 """
 
 
+class MultiHeadSelfAttention(nn.Module):
+    """ViT Multi-Head Self Attention."""
+
+    embedded_dim: int = 384
+    head: int = 3
+    dropout_rate: float = 0.0
+    dtype: Any = jnp.float32
+
+    def setup(self):
+        self.head_dim = self.embedded_dim // self.head
+        self.sqrt_dh = self.head_dim**0.5
+
+    @nn.compact
+    def __call__(self, x, train: bool = True):
+        linear = partial(nn.Dense, use_bias=False, dtype=self.dtype)
+
+        batch, num_patch, _ = x.shape
+
+        # embedded
+        # (B, N, D) ~> (B, N, D)
+        q = linear(self.embedded_dim)(x)
+        k = linear(self.embedded_dim)(x)
+        v = linear(self.embedded_dim)(x)
+
+        # (B, N, D) -> (B, N, h, D//h)
+        q = jnp.reshape(q, (batch, num_patch, self.head, self.head_dim))
+        k = jnp.reshape(k, (batch, num_patch, self.head, self.head_dim))
+        v = jnp.reshape(v, (batch, num_patch, self.head, self.head_dim))
+
+        # (B, N, h, D//h) -> (B, h, N, D//h)
+        q = jnp.transpose(q, (0, 2, 1, 3))
+        k = jnp.transpose(k, (0, 2, 1, 3))
+        v = jnp.transpose(v, (0, 2, 1, 3))
+
+        # (B, h, N, D//h) -> (B, h, D//h, N)
+        k_T = jnp.transpose(k, (0, 1, 3, 2))
+        # (B, h, N, D//h) x (B, h, D//h, N) -> (B, h, N, N)
+        dots = (q @ k_T) / self.sqrt_dh
+        attn = nn.softmax(dots, axis=-1)
+        attn = nn.Dropout(rate=self.dropout_rate)(attn, deterministic=not train)
+
+        # (B, h, N, N) x (B, h, N, D//h) -> (B, h, N, D//h)
+        out = attn @ v
+        # (B, h, N, D//h) -> (B, N, h, D//h)
+        out = jnp.transpose(out, (0, 2, 1, 3))
+        # (B, N, h, D//h) -> (B, N, D)
+        out = jnp.reshape(out, (batch, num_patch, self.embedded_dim))
+
+        # (B, N, D) -> (B, N, D)
+        out = linear(self.embedded_dim)(out)
+        out = nn.Dropout(rate=self.dropout_rate)(out, deterministic=not train)
+
+        return out
+
+
 class VitInputLayer(nn.Module):
     """Vit Input layer."""
 
