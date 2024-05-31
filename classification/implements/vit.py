@@ -8,12 +8,11 @@
 """
 
 from functools import partial
-from typing import Any, Sequence, Optional, Tuple
+from typing import Any
 
 from flax import linen as nn
 import jax
 import jax.numpy as jnp
-import numpy as np
 
 ModuleDef = Any
 
@@ -22,6 +21,43 @@ ModuleDef = Any
     Reference:
      - https://gihyo.jp/book/2022/978-4-297-13058-9
 """
+
+
+class VitEncoderBlock(nn.Module):
+    """ViT Encoder Block."""
+
+    embedded_dim: int = 384
+    head: int = 3
+    hidden_dim: int = 384 * 4
+    dropout_rate: float = 0.0
+    dtype: Any = jnp.float32
+
+    @nn.compact
+    def __call__(self, x, train: bool = True):
+        linear = partial(nn.Dense, use_bias=False, dtype=self.dtype)
+        norm = partial(nn.LayerNorm, dtype=self.dtype)
+        act = partial(nn.activation.gelu, approximate=False)
+        msa = partial(
+            MultiHeadSelfAttention,
+            embedded_dim=self.embedded_dim,
+            head=self.head,
+            dropout_rate=self.dropout_rate,
+            dtype=self.dtype,
+        )
+
+        y = norm()(x)
+        y = msa()(y) + x
+
+        z = norm()(y)
+        z = linear(self.embedded_dim)(z)
+        z = act(z)
+        z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=not train)
+        z = linear(self.embedded_dim)(z)
+        z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=not train)
+        z = z + y
+
+        print(z.shape)
+        return z
 
 
 class MultiHeadSelfAttention(nn.Module):

@@ -11,7 +11,7 @@ import jax
 from absl.testing import absltest, parameterized
 from clu import parameter_overview
 from jax import numpy as jnp
-from vit import VitInputLayer, MultiHeadSelfAttention
+from vit import VitInputLayer, MultiHeadSelfAttention, VitEncoderBlock
 
 """Tests for ViT."""
 
@@ -36,6 +36,19 @@ class ViTTest(parameterized.TestCase):
             "dropout": jax.random.PRNGKey(1),
         }
         model_def = MultiHeadSelfAttention(dtype=jnp.float32)
+        variables = model_def.init(rngs, jnp.ones((2, 5, 384), jnp.float32))
+
+        self.assertLen(variables, 1)
+
+        print(parameter_overview.get_parameter_overview(variables))
+
+    def test_encoder_block(self):
+        """Tests ViT Encodr Block definition and output (variables)."""
+        rngs = {
+            "params": jax.random.PRNGKey(0),
+            "dropout": jax.random.PRNGKey(1),
+        }
+        model_def = VitEncoderBlock(dtype=jnp.float32)
         variables = model_def.init(rngs, jnp.ones((2, 5, 384), jnp.float32))
 
         self.assertLen(variables, 1)
