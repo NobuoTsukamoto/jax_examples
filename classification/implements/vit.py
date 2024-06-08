@@ -56,7 +56,6 @@ class VitEncoderBlock(nn.Module):
         z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=not train)
         z = z + y
 
-        print(z.shape)
         return z
 
 
@@ -170,3 +169,55 @@ class VitInputLayer(nn.Module):
         z_0 = z_0 + self.pos_emb
 
         return z_0
+
+
+class ViT(nn.Module):
+    """Vit Module."""
+
+    in_channels: int = 3
+    num_classes: int = 10
+    embedded_dim: int = 384
+    num_patch_row: int = 2
+    image_size: int = 32
+    num_blocks: int = 7
+    head: int = 3
+    hidden_dim: int = 384 * 4
+    dropout_rate: float = 0.0
+    dtype: Any = jnp.float32
+
+    @nn.compact
+    def __call__(self, x, train: bool = True):
+        input_layer = partial(
+            VitInputLayer,
+            in_channels=self.in_channels,
+            embedded_dim=self.embedded_dim,
+            num_patch_row=self.num_patch_row,
+            image_size=self.image_size,
+            dtype=self.dtype,
+        )
+        encoder = partial(
+            VitEncoderBlock,
+            embedded_dim=self.embedded_dim,
+            head=self.head,
+            hidden_dim=self.hidden_dim,
+            dropout_rate=self.dropout_rate,
+            dtype=self.dtype,
+        )
+        linear = partial(nn.Dense, use_bias=False, dtype=self.dtype)
+        norm = partial(nn.LayerNorm, dtype=self.dtype)
+
+        # Input Layer
+        x = input_layer()(x)
+
+        # Encoder
+        for _ in range(self.num_blocks):
+            x = encoder()(x, train=train)
+
+        # Class Token
+        clas_token = x[:, 0]
+
+        # MLP Head
+        x = norm()(clas_token)
+        x = linear(self.num_classes)(x)
+
+        return x
