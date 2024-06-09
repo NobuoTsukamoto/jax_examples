@@ -96,3 +96,4 @@ ViT_4S = partial(
     num_blocks=12,
     head=6,
     hidden_dim=384,
+)
