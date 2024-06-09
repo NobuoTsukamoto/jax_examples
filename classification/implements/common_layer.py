@@ -172,6 +172,7 @@ class BottleneckConvNeXtBlock(nn.Module):
 
     features: int
     conv: ModuleDef
+    linear: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef
     layer_scale: ModuleDef
@@ -195,11 +196,11 @@ class BottleneckConvNeXtBlock(nn.Module):
         y = self.norm()(y)
 
         # y = self.conv(self.features * 4, (1, 1))(y)
-        y = nn.Dense(self.features * 4, dtype=jnp.float32)(y)
+        y = self.linear(self.features * 4)(y)
         y = self.act(y)
 
         # y = self.conv(self.features, (1, 1))(y)
-        y = nn.Dense(self.features, dtype=jnp.float32)(y)
+        y = self.linear(self.features)(y)
 
         y = self.layer_scale(projection_dim=self.features)(y)
         if self.stochastic_depth_drop_rate > 0.0:

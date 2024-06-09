@@ -37,6 +37,7 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 | Searching for MobileNetV3 | https://arxiv.org/abs/1905.02244 |
 | Identity Mappings in Deep Residual Networks | https://arxiv.org/abs/1603.05027 |
 | Deep Residual Learning for Image Recognition | https://arxiv.org/abs/1512.03385 |
+| A ConvNet for the 2020s | https://arxiv.org/abs/2201.03545 |
 
 ## Semantic Segmentation Task
 
