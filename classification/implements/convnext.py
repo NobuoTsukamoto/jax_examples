@@ -103,7 +103,6 @@ class ConvNeXt(nn.Module):
                 0, self.init_stochastic_depth_rate, sum(self.stage_sizes)
             )
         ]
-        print(stochastic_depth_rate)
 
         conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
         linear = partial(nn.Dense, use_bias=False, dtype=self.dtype)
