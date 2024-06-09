@@ -61,7 +61,7 @@ class ViTTest(parameterized.TestCase):
             "params": jax.random.PRNGKey(0),
             "dropout": jax.random.PRNGKey(1),
         }
-        bach_size, height, width, channel = 2, 32, 32, 2
+        bach_size, height, width, channel = 2, 224, 224, 2
         model_def = ViT(in_channels=channel, dtype=jnp.float32)
         variables = model_def.init(
             rngs, jnp.ones((bach_size, height, width, channel), jnp.float32)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -18,6 +18,7 @@ import ml_collections
 
     Besed on:
         https://github.com/google/flax/blob/main/examples/imagenet/input_pipeline.py
+        https://github.com/tensorflow/models/blob/master/official/vision/dataloaders/classification_input.py
 """
 
 IMAGE_SIZE = 224
@@ -48,13 +49,13 @@ def preprocess_for_train(
     cropped_image = tfm.vision.preprocess_ops.random_crop_image(
         image, area_range=config.crop_area_range, seed=config.seed
     )
-
     image = tf.cond(
         tf.reduce_all(tf.equal(tf.shape(cropped_image), tf.shape(image))),
         lambda: tfm.vision.preprocess_ops.center_crop_image(image),
         lambda: cropped_image,
     )
 
+    # Random flips.
     if config.aug_rand_horizontal_flip:
         image = tf.image.random_flip_left_right(image, seed=config.seed)
 
@@ -65,7 +66,7 @@ def preprocess_for_train(
             config.color_jitter,
             config.color_jitter,
             config.color_jitter,
-            seed=config.seed
+            seed=config.seed,
         )
 
     # Resizes image.
@@ -76,11 +77,11 @@ def preprocess_for_train(
     )
     image.set_shape([config.image_size, config.image_size, 3])
 
-    # Apply autoaug or randaug
+    # Apply autoaug or randaug.
     if augmenter is not None:
         image = augmenter.distort(image)
 
-    # Three augmentation
+    # Three augmentation.
     if config.three_augment:
         image = tfm.vision.augment.AutoAugment(
             augmentation_name="deit3_three_augment",

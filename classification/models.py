@@ -14,6 +14,7 @@ from implements.mobilenet_v3 import MobileNetV3, Large, Small
 from implements.resnet_v2 import ResNetV2, ResNet50V2_layer
 from implements.resnet_v1 import ResNet
 from implements.convnext import ConvNeXt
+from implements.vit import ViT
 
 from implements.common_layer import (
     ResNetBlock,
@@ -63,6 +64,7 @@ ConvNeXt_T = partial(
     kernel_size=(7, 7),
     block_cls=BottleneckConvNeXtBlock,
 )
+
 ConvNeXt_S = partial(
     ConvNeXt,
     stage_sizes=[3, 3, 27, 3],
@@ -77,3 +79,20 @@ ConvNeXt_B = partial(
     kernel_size=(7, 7),
     block_cls=BottleneckConvNeXtBlock,
 )
+
+# ViT-4T
+ViT_4T = partial(
+    ViT,
+    num_patch_row=4,
+    num_blocks=12,
+    head=3,
+    hidden_dim=192,
+)
+
+# ViT-4S
+ViT_4S = partial(
+    ViT,
+    num_patch_row=4,
+    num_blocks=12,
+    head=6,
+    hidden_dim=384,
