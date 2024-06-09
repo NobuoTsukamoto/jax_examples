@@ -8,11 +8,13 @@
 """
 
 from functools import partial
-from typing import Any
+from typing import Any, Optional
 
 from flax import linen as nn
 import jax
 import jax.numpy as jnp
+
+from .stochastic_depth import get_stochastic_depth_rate, StochasticDepth
 
 ModuleDef = Any
 
@@ -30,6 +32,8 @@ class VitEncoderBlock(nn.Module):
     head: int = 3
     hidden_dim: int = 384 * 4
     dropout_rate: float = 0.0
+    stochastic_depth: ModuleDef = None
+    stochastic_depth_drop_rate: float = 0.0
     dtype: Any = jnp.float32
 
     @nn.compact
@@ -46,7 +50,12 @@ class VitEncoderBlock(nn.Module):
         )
 
         y = norm()(x)
-        y = msa()(y) + x
+        y = msa()(y)
+        if self.stochastic_depth_drop_rate > 0.0:
+            y = self.stochastic_depth(
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+            )(y)
+        y = y + x
 
         z = norm()(y)
         z = linear(self.embedded_dim)(z)
@@ -54,6 +63,10 @@ class VitEncoderBlock(nn.Module):
         z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=not train)
         z = linear(self.embedded_dim)(z)
         z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=not train)
+        if self.stochastic_depth_drop_rate > 0.0:
+            z = self.stochastic_depth(
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+            )(z)
         z = z + y
 
         return z
@@ -121,6 +134,7 @@ class VitInputLayer(nn.Module):
     embedded_dim: int = 384
     num_patch_row: int = 2
     image_size: int = 32
+    init_stochastic_depth_rate: Optional[float] = 0.0
     dtype: Any = jnp.float32
 
     def setup(self):
@@ -178,21 +192,24 @@ class ViT(nn.Module):
     num_classes: int = 10
     embedded_dim: int = 384
     num_patch_row: int = 2
-    image_size: int = 32
     num_blocks: int = 7
     head: int = 3
     hidden_dim: int = 384 * 4
     dropout_rate: float = 0.0
+    init_stochastic_depth_rate: Optional[float] = 0.0
     dtype: Any = jnp.float32
 
     @nn.compact
     def __call__(self, x, train: bool = True):
+        image_size = x.shape[1]
+
+        stochastic_depth = partial(StochasticDepth, deterministic=not train)
         input_layer = partial(
             VitInputLayer,
             in_channels=self.in_channels,
             embedded_dim=self.embedded_dim,
             num_patch_row=self.num_patch_row,
-            image_size=self.image_size,
+            image_size=image_size,
             dtype=self.dtype,
         )
         encoder = partial(
@@ -201,6 +218,7 @@ class ViT(nn.Module):
             head=self.head,
             hidden_dim=self.hidden_dim,
             dropout_rate=self.dropout_rate,
+            stochastic_depth=stochastic_depth,
             dtype=self.dtype,
         )
         linear = partial(nn.Dense, use_bias=False, dtype=self.dtype)
@@ -210,8 +228,15 @@ class ViT(nn.Module):
         x = input_layer()(x)
 
         # Encoder
-        for _ in range(self.num_blocks):
-            x = encoder()(x, train=train)
+        for i in range(self.num_blocks):
+            stochastic_depth_drop_rate = get_stochastic_depth_rate(
+                self.init_stochastic_depth_rate,
+                i,
+                self.num_blocks,
+            )
+            x = encoder(stochastic_depth_drop_rate=stochastic_depth_drop_rate)(
+                x, train=train
+            )
 
         # Class Token
         clas_token = x[:, 0]
