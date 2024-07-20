@@ -241,18 +241,18 @@ def create_split(
             "image": tfds.decode.SkipDecoding(),
         },
     )
+
     options = tf.data.Options()
     options.threading.private_threadpool_size = 48
     ds = ds.with_options(options)
 
+    ds = ds.map(decode_example, num_parallel_calls=tf.data.AUTOTUNE)
     if config.cache:
         ds = ds.cache()
-
     if train:
         ds = ds.repeat()
         ds = ds.shuffle(16 * batch_size, seed=config.seed)
 
-    ds = ds.map(decode_example, num_parallel_calls=tf.data.AUTOTUNE)
     ds = ds.batch(batch_size, drop_remainder=True)
 
     if postprocess_fn is not None:
