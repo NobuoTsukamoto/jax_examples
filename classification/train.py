@@ -16,7 +16,6 @@ import jax.numpy as jnp
 import ml_collections
 import models
 import optax
-import orbax
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from absl import logging
@@ -26,7 +25,6 @@ from flax.training import checkpoints
 from flax.training import common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
 from flax.training import train_state
-from flax.training import orbax_utils
 from jax import lax
 
 """ Training Image classfication model.
