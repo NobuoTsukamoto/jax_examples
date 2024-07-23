@@ -392,7 +392,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         steps_per_eval = config.steps_per_eval
 
     steps_per_checkpoint = steps_per_epoch
-    base_learning_rate = config.learning_rate * config.batch_size / 256.0
+    # base_learning_rate = config.learning_rate * config.batch_size / 256.0
+    base_learning_rate = config.learning_rate * config.batch_size
     model_cls = getattr(models, config.model)
     model = create_model(
         model_cls=model_cls,
