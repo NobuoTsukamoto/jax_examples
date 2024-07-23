@@ -317,6 +317,9 @@ def create_train_state(
             nesterov=True,
         )
 
+    if config.model_ema_decay > 0.0:
+        tx = optax.chain(tx, optax.ema(decay=config.model_ema_decay))
+
     if batch_stats is not None:
         state = TrainStateWithBatchNorm.create(
             apply_fn=model.apply,

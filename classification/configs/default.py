@@ -37,6 +37,8 @@ def get_config():
     config.cache = False
     config.half_precision = False
 
+    config.model_ema_decay = 0.0
+
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
     config.aug_type = "randaug"  # randaug, autoaug, none
