@@ -318,6 +318,10 @@ def create_train_state(
         )
 
     if config.model_ema_decay > 0.0:
+        logging.info(
+            "Decay rate for the exponential moving average. : %f.",
+            config.model_ema_decay,
+        )
         tx = optax.chain(tx, optax.ema(decay=config.model_ema_decay))
 
     if batch_stats is not None:
@@ -392,8 +396,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         steps_per_eval = config.steps_per_eval
 
     steps_per_checkpoint = steps_per_epoch
-    # base_learning_rate = config.learning_rate * config.batch_size / 256.0
-    base_learning_rate = config.learning_rate * config.batch_size
+    base_learning_rate = config.learning_rate
     model_cls = getattr(models, config.model)
     model = create_model(
         model_cls=model_cls,
