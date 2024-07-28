@@ -43,7 +43,7 @@ def get_config():
 
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
-    config.aug_type = "randaug"  # randaug, autoaug, none
+    config.aug_type = "none"  # randaug, autoaug, none
 
     # autoaug
     config.autoaug_augmentation_name = "v0"
