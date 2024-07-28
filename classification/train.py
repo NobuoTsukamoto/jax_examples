@@ -117,6 +117,7 @@ def train_step(
     stochastic_depth_rng=None,
     with_batchnorm=True,
     l2_weight_decay=0.0001,
+    gradient_accumulation_steps=1,
 ):
     """Perform a single training step."""
 
@@ -160,7 +161,7 @@ def train_step(
 
     step = state.step
     dynamic_scale = state.dynamic_scale
-    lr = learning_rate_fn(step)
+    lr = learning_rate_fn(step // gradient_accumulation_steps)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
@@ -319,10 +320,17 @@ def create_train_state(
 
     if config.model_ema_decay > 0.0:
         logging.info(
-            "Decay rate for the exponential moving average. : %f.",
+            "Decay rate for the exponential moving average. : %f",
             config.model_ema_decay,
         )
         tx = optax.chain(tx, optax.ema(decay=config.model_ema_decay))
+
+    if config.gradient_accumulation_steps > 1:
+        logging.info(
+            "Gradient accumulation steps. : %d",
+            config.gradient_accumulation_steps,
+        )
+        tx = optax.MultiSteps(tx, config.gradient_accumulation_steps)
 
     if batch_stats is not None:
         state = TrainStateWithBatchNorm.create(
@@ -395,6 +403,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     else:
         steps_per_eval = config.steps_per_eval
 
+    logging.info(
+        "Steps per epech : %d, Step per eval : %d.", steps_per_epoch, steps_per_eval
+    )
+
     steps_per_checkpoint = steps_per_epoch
     base_learning_rate = config.learning_rate
     model_cls = getattr(models, config.model)
@@ -406,7 +418,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     )
 
     learning_rate_fn = create_learning_rate_fn(
-        config, base_learning_rate, steps_per_epoch
+        config,
+        base_learning_rate,
+        (steps_per_epoch // config.gradient_accumulation_steps),
     )
 
     state, with_batchnorm = create_train_state(
@@ -425,6 +439,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
             l2_weight_decay=config.l2_weight_decay,
+            gradient_accumulation_steps=config.gradient_accumulation_steps,
         ),
         axis_name="batch",
     )

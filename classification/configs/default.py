@@ -39,6 +39,8 @@ def get_config():
 
     config.model_ema_decay = 0.0
 
+    config.gradient_accumulation_steps = 1
+
     # Input and augmentation
     config.aug_rand_horizontal_flip = True
     config.aug_type = "randaug"  # randaug, autoaug, none
