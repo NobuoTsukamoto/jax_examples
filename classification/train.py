@@ -118,6 +118,7 @@ def train_step(
     with_batchnorm=True,
     l2_weight_decay=0.0001,
     gradient_accumulation_steps=1,
+    ema_decay=0.0,
 ):
     """Perform a single training step."""
 
@@ -161,7 +162,7 @@ def train_step(
 
     step = state.step
     dynamic_scale = state.dynamic_scale
-    lr = learning_rate_fn(step // gradient_accumulation_steps)
+    lr = learning_rate_fn((step + 1) // gradient_accumulation_steps)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
@@ -204,14 +205,27 @@ def train_step(
         )
         metrics["scale"] = dynamic_scale.scale
 
+    if ema_decay > 0.0:
+        new_state = jax.lax.cond(
+            (step + 1) % gradient_accumulation_steps == 0,
+            lambda _: new_state.replace(ema_params=new_state.apply_ema()),
+            lambda _: new_state,
+            None,
+        )
+
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
 
-def eval_step(state, batch, num_classes, with_batchnorm):
-    if with_batchnorm:
-        variables = {"params": state.params, "batch_stats": state.batch_stats}
+def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
+    if model_ema:
+        params = state.ema_params
     else:
-        variables = {"params": state.params}
+        params = state.params
+
+    if with_batchnorm:
+        variables = {"params": params, "batch_stats": state.batch_stats}
+    else:
+        variables = {"params": params}
 
     logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     return compute_metrics(logits, batch["label"], num_classes)
@@ -248,6 +262,15 @@ def create_input_iter(dataset_builder, batch_size, dtype, train, config):
 class TrainStateWithBatchNorm(train_state.TrainState):
     batch_stats: Any
     dynamic_scale: dynamic_scale_lib.DynamicScale
+    ema_decay: float = 0.0
+    ema_params: Any = None
+
+    def apply_ema(self):
+        return jax.tree_util.tree_map(
+            lambda ema, param: (ema * self.ema_decay + param * (1.0 - self.ema_decay)),
+            self.ema_params,
+            self.params,
+        )
 
 
 class TrainStateWithoutBatchNorm(train_state.TrainState):
@@ -323,7 +346,6 @@ def create_train_state(
             "Decay rate for the exponential moving average. : %f",
             config.model_ema_decay,
         )
-        tx = optax.chain(tx, optax.ema(decay=config.model_ema_decay))
 
     if config.gradient_accumulation_steps > 1:
         logging.info(
@@ -339,6 +361,8 @@ def create_train_state(
             tx=tx,
             batch_stats=batch_stats,
             dynamic_scale=dynamic_scale,
+            ema_params=params,
+            ema_decay=config.model_ema_decay,
         )
         with_batchnorm = True
     else:
@@ -440,6 +464,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             with_batchnorm=with_batchnorm,
             l2_weight_decay=config.l2_weight_decay,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
+            ema_decay=config.model_ema_decay,
         ),
         axis_name="batch",
     )
@@ -449,7 +474,15 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         ),
         axis_name="batch",
     )
-
+    p_ema_eval_step = jax.pmap(
+        functools.partial(
+            eval_step,
+            num_classes=num_classes,
+            with_batchnorm=with_batchnorm,
+            model_ema=True,
+        ),
+        axis_name="batch",
+    )
     dropout_rngs = jax.random.split(dropout_rng, jax.local_device_count())
     stochastic_depth_rngs = jax.random.split(
         stochastic_depth_rng, jax.local_device_count()
@@ -514,6 +547,28 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                 step + 1, {f"eval_{key}": val for key, val in summary.items()}
             )
             writer.flush()
+
+            if config.model_ema_decay > 0.0 and config.model_ema:
+                eval_ema_metrics = []
+                for _ in range(steps_per_eval):
+                    eval_batch = next(eval_iter)
+                    metrics = p_ema_eval_step(state, eval_batch)
+                    eval_ema_metrics.append(metrics)
+                eval_ema_metrics = common_utils.get_metrics(eval_ema_metrics)
+                ema_summary = jax.tree_util.tree_map(
+                    lambda x: x.mean(), eval_ema_metrics
+                )
+                logging.info(
+                    "eval epoch: %d, loss: %.4f, accuracy: %.2f",
+                    epoch,
+                    ema_summary["loss"],
+                    ema_summary["accuracy"] * 100,
+                )
+                writer.write_scalars(
+                    step + 1,
+                    {f"eval_ema_{key}": val for key, val in ema_summary.items()},
+                )
+                writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
             if with_batchnorm:

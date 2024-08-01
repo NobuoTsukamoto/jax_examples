@@ -37,6 +37,7 @@ def get_config():
     config.cache = False
     config.half_precision = False
 
+    config.model_ema = False
     config.model_ema_decay = 0.0
 
     config.gradient_accumulation_steps = 1
