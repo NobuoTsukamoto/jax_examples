@@ -26,6 +26,7 @@ def get_config():
     config.batch_size = 128
     config.label_smoothing = 0.1
     config.model_ema_decay = 0.9999
+    config.model_ema = True
 
     config.num_epochs = 300
 
