@@ -37,7 +37,7 @@ def get_config():
     config.randaug_translate_const = 10
     config.randaug_magnitude_std = 0.5
     config.randaug_prob_to_apply = None
-    config.randaug_exclude_ops = ["Cutout"]
+    config.randaug_exclude_ops = None
 
     # random erasing
     config.random_erasing = False

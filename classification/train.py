@@ -9,6 +9,7 @@
 import functools
 import time
 from typing import Any, Dict
+import math
 
 import input_pipeline
 import jax
@@ -162,7 +163,7 @@ def train_step(
 
     step = state.step
     dynamic_scale = state.dynamic_scale
-    lr = learning_rate_fn((step + 1) // gradient_accumulation_steps)
+    lr = learning_rate_fn(step // gradient_accumulation_steps)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
@@ -207,7 +208,7 @@ def train_step(
 
     if ema_decay > 0.0:
         new_state = jax.lax.cond(
-            (step + 1) % gradient_accumulation_steps == 0,
+            step % gradient_accumulation_steps == 0,
             lambda _: new_state.replace(ema_params=new_state.apply_ema()),
             lambda _: new_state,
             None,
@@ -423,7 +424,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
 
     if config.steps_per_eval == -1:
         num_validation_examples = dataset_builder.info.splits["validation"].num_examples
-        steps_per_eval = num_validation_examples // config.batch_size
+        steps_per_eval = math.ceil(num_validation_examples / config.batch_size)
     else:
         steps_per_eval = config.steps_per_eval
 

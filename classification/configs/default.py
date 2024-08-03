@@ -58,7 +58,7 @@ def get_config():
     config.randaug_translate_const = 0.0
     config.randaug_magnitude_std = 0.0
     config.randaug_prob_to_apply = None
-    config.randaug_exclude_ops = ["Cutout"]
+    config.randaug_exclude_ops = None
 
     config.color_jitter = 0.0
 
