@@ -163,7 +163,16 @@ def train_step(
 
     step = state.step
     dynamic_scale = state.dynamic_scale
-    lr = learning_rate_fn(step // gradient_accumulation_steps)
+    if gradient_accumulation_steps > 0:
+        lr = jax.lax.cond(
+            step % gradient_accumulation_steps == 0,
+            lambda _: learning_rate_fn(step // gradient_accumulation_steps),
+            lambda _: lr,
+            None,
+        )
+
+    else:
+        lr = learning_rate_fn(step)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
