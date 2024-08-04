@@ -237,7 +237,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
         functools.partial(
             train_step,
             num_classes=num_classes,
-            gradient_accumulation_steps=config.gradient_accumulation_steps,
         ),
         axis_name="batch",
     )
