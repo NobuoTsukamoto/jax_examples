@@ -163,16 +163,7 @@ def train_step(
 
     step = state.step
     dynamic_scale = state.dynamic_scale
-    if gradient_accumulation_steps > 0:
-        lr = jax.lax.cond(
-            step % gradient_accumulation_steps == 0,
-            lambda _: learning_rate_fn(step // gradient_accumulation_steps),
-            lambda _: lr,
-            None,
-        )
-
-    else:
-        lr = learning_rate_fn(step)
+    lr = learning_rate_fn(step)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(loss_fn, has_aux=True, axis_name="batch")
@@ -327,7 +318,6 @@ def create_train_state(
     rngs: Dict[str, jnp.ndarray],
     config: ml_collections.ConfigDict,
     model,
-    image_size,
     learning_rate_fn,
 ):
     """Create initial training state."""
@@ -338,7 +328,7 @@ def create_train_state(
     else:
         dynamic_scale = None
 
-    params, batch_stats = initialized(rngs, image_size, model)
+    params, batch_stats = initialized(rngs, config.image_size, model)
     if config.optimizer == "adamw":
         tx = optax.adamw(
             learning_rate=learning_rate_fn, weight_decay=config.adamw_weight_decay
@@ -422,9 +412,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     )
     num_classes = dataset_builder.info.features["label"].num_classes
 
-    steps_per_epoch = (
-        dataset_builder.info.splits["train"].num_examples // config.batch_size
+    steps_per_epoch = math.ceil(
+        dataset_builder.info.splits["train"].num_examples
+        / (config.batch_size * config.gradient_accumulation_steps)
     )
+    steps_per_epoch *= config.gradient_accumulation_steps
 
     if config.num_train_steps <= 0:
         num_steps = int(steps_per_epoch * config.num_epochs)
@@ -452,14 +444,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     )
 
     learning_rate_fn = create_learning_rate_fn(
-        config,
-        base_learning_rate,
-        (steps_per_epoch // config.gradient_accumulation_steps),
+        config, base_learning_rate, steps_per_epoch
     )
 
-    state, with_batchnorm = create_train_state(
-        rngs, config, model, config.image_size, learning_rate_fn
-    )
+    state, with_batchnorm = create_train_state(rngs, config, model, learning_rate_fn)
     state = restore_checkpoint(state, workdir)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
