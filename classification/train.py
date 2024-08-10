@@ -88,23 +88,31 @@ def compute_metrics(logits, labels, num_classes, label_smoothing=0.0):
     return metrics
 
 
-def create_learning_rate_fn(
-    config: ml_collections.ConfigDict, base_learning_rate: float, steps_per_epoch: int
-):
+def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: int):
     """Create learning rate schedule."""
-    warmup_fn = optax.linear_schedule(
-        init_value=0.0,
-        end_value=base_learning_rate,
-        transition_steps=config.warmup_epochs * steps_per_epoch,
-    )
-    cosine_epochs = max(config.num_epochs - config.warmup_epochs, 1)
-    cosine_fn = optax.cosine_decay_schedule(
-        init_value=base_learning_rate, decay_steps=cosine_epochs * steps_per_epoch
-    )
-    schedule_fn = optax.join_schedules(
-        schedules=[warmup_fn, cosine_fn],
-        boundaries=[config.warmup_epochs * steps_per_epoch],
-    )
+    if config.optimizer_schedule == "warmup_exponential_decay":
+        schedule_fn = optax.warmup_exponential_decay_schedule(
+            init_value=config.initial_learning_rate,
+            peak_value=config.learning_rate,
+            warmup_steps=config.warmup_epochs * steps_per_epoch,
+            transition_steps=config.num_epochs * steps_per_epoch,
+            decay_rate=config.exponential_decay_rate,
+            staircase=False,
+            end_value=1e-6,
+        )
+
+    elif config.optimizer_schedule == "warmup_cosine_decay":
+        schedule_fn = optax.warmup_cosine_decay_schedule(
+            init_value=config.initial_learning_rate,
+            peak_value=config.learning_rate,
+            warmup_steps=config.warmup_epochs * steps_per_epoch,
+            decay_steps=config.num_epochs * steps_per_epoch,
+            end_value=1e-6,
+        )
+
+    else:
+        schedule_fn = optax.constant_schedule(config.learning_rate)
+
     return schedule_fn
 
 
@@ -276,6 +284,15 @@ class TrainStateWithBatchNorm(train_state.TrainState):
 
 class TrainStateWithoutBatchNorm(train_state.TrainState):
     dynamic_scale: dynamic_scale_lib.DynamicScale
+    ema_decay: float = 0.0
+    ema_params: Any = None
+
+    def apply_ema(self):
+        return jax.tree_util.tree_map(
+            lambda ema, param: (ema * self.ema_decay + param * (1.0 - self.ema_decay)),
+            self.ema_params,
+            self.params,
+        )
 
 
 def restore_checkpoint(state, workdir):
@@ -434,7 +451,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     )
 
     steps_per_checkpoint = steps_per_epoch
-    base_learning_rate = config.learning_rate
     model_cls = getattr(models, config.model)
     model = create_model(
         model_cls=model_cls,
@@ -443,9 +459,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         init_stochastic_depth_rate=config.init_stochastic_depth_rate,
     )
 
-    learning_rate_fn = create_learning_rate_fn(
-        config, base_learning_rate, steps_per_epoch
-    )
+    learning_rate_fn = create_learning_rate_fn(config, steps_per_epoch)
 
     state, with_batchnorm = create_train_state(rngs, config, model, learning_rate_fn)
     state = restore_checkpoint(state, workdir)

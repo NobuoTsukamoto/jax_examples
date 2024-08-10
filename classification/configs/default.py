@@ -22,9 +22,13 @@ def get_config():
     config.dataset = "imagenette/full-size-v2:1.*.*"
     config.dataset_dir = "/workdir/tensorflow_datasets/"
 
+    # optimizer
     config.optimizer = "sgd"
+    config.optimizer_schedule = "warmup_cosine_decay"
     config.adamw_weight_decay = 0.0001
+    config.initial_learning_rate = 0.0
     config.learning_rate = 0.1
+    config.exponential_decay_rate = 0.0
     config.warmup_epochs = 5.0
     config.momentum = 0.9
     config.batch_size = 64
