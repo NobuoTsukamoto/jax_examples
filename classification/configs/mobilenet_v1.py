@@ -24,7 +24,7 @@ def get_config():
     config.initial_learning_rate = 0.0
     config.learning_rate = 0.032  # 0.008 * batch_size / 128
     config.warmup_epochs = 5
-    config.exponential_decay_rate = 0.2
+    config.exponential_decay_rate = 0.94
 
     config.half_precision = True
     config.batch_size = 512
