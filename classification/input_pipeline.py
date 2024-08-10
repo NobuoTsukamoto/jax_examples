@@ -251,7 +251,7 @@ def create_split(
         ds = ds.cache()
     if train:
         ds = ds.repeat()
-        ds = ds.shuffle(16 * batch_size, seed=config.seed)
+        ds = ds.shuffle(32 * batch_size, seed=config.seed)
 
     ds = ds.batch(batch_size, drop_remainder=True)
 
