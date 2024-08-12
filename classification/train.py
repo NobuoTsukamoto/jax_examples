@@ -98,7 +98,7 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
             transition_steps=config.num_epochs * steps_per_epoch,
             decay_rate=config.exponential_decay_rate,
             staircase=False,
-            end_value=1e-6,
+            end_value=config.end_learning_rate,
         )
 
     elif config.optimizer_schedule == "warmup_cosine_decay":
@@ -107,7 +107,7 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
             peak_value=config.learning_rate,
             warmup_steps=config.warmup_epochs * steps_per_epoch,
             decay_steps=config.num_epochs * steps_per_epoch,
-            end_value=1e-6,
+            end_value=config.end_learning_rate,
         )
 
     else:
@@ -349,6 +349,14 @@ def create_train_state(
     if config.optimizer == "adamw":
         tx = optax.adamw(
             learning_rate=learning_rate_fn, weight_decay=config.adamw_weight_decay
+        )
+
+    elif config.optimizer == "rmsprop":
+        tx = optax.rmsprop(
+            learning_rate=learning_rate_fn,
+            decay=config.rmsprop_decay,
+            momentum=config.rmsprop_momentum,
+            eps=config.rmsprop_epsilon,
         )
 
     elif config.optimizer == "sgd":

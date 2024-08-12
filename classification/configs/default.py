@@ -28,6 +28,7 @@ def get_config():
     config.adamw_weight_decay = 0.0001
     config.initial_learning_rate = 0.0
     config.learning_rate = 0.1
+    config.end_learning_rate = 0.0
     config.exponential_decay_rate = 0.0
     config.warmup_epochs = 5.0
     config.momentum = 0.9
