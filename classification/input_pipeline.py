@@ -227,12 +227,7 @@ def create_split(
         return {"image": image, "label": example["label"]}
 
     def postprocess(example):
-        if train:
-            image, label = postprocess_fn.distort(example["image"], example["label"])
-        else:
-            image = example["image"]
-            label = example["label"]
-
+        image, label = postprocess_fn.distort(example["image"], example["label"])
         return {"image": image, "label": label}
 
     ds = dataset_builder.as_dataset(
@@ -255,7 +250,7 @@ def create_split(
 
     ds = ds.batch(batch_size, drop_remainder=True)
 
-    if postprocess_fn is not None:
+    if train and postprocess_fn is not None:
         ds = ds.map(postprocess, num_parallel_calls=tf.data.AUTOTUNE)
 
     if not train:

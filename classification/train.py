@@ -215,12 +215,13 @@ def train_step(
         metrics["scale"] = dynamic_scale.scale
 
     if ema_decay > 0.0:
-        new_state = jax.lax.cond(
-            step % gradient_accumulation_steps == 0,
-            lambda _: new_state.replace(ema_params=new_state.apply_ema()),
-            lambda _: new_state,
-            None,
-        )
+        new_state = new_state.replace(ema_params=new_state.apply_ema())
+        # new_state = jax.lax.cond(
+        #     step % gradient_accumulation_steps == 0,
+        #     lambda _: new_state.replace(ema_params=new_state.apply_ema()),
+        #     lambda _: new_state,
+        #    None,
+        # )
 
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
@@ -233,10 +234,11 @@ def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
 
     if with_batchnorm:
         variables = {"params": params, "batch_stats": state.batch_stats}
+        logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     else:
         variables = {"params": params}
+        logits = state.apply_fn(variables, batch["image"], train=False)
 
-    logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     return compute_metrics(logits, batch["label"], num_classes)
 
 
@@ -391,11 +393,14 @@ def create_train_state(
         )
         with_batchnorm = True
     else:
+        logging.info("Batch statistics are not found.")
         state = TrainStateWithoutBatchNorm.create(
             apply_fn=model.apply,
             params=params,
             tx=tx,
             dynamic_scale=dynamic_scale,
+            ema_params=params,
+            ema_decay=config.model_ema_decay,
         )
         with_batchnorm = False
 

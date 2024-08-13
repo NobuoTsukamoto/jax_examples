@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
 
 from functools import partial
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 import jax.numpy as jnp
 import jax.nn as jnn
@@ -87,6 +87,8 @@ class MobileNetV3(nn.Module):
     layers: Dict
     last_block_filters: int
     dtype: Any = jnp.float32
+    dropout_rate: Optional[float] = 0.2
+    init_stochastic_depth_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, x, train: bool = True):
@@ -94,8 +96,8 @@ class MobileNetV3(nn.Module):
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
-            momentum=0.9,
-            epsilon=1e-5,
+            momentum=0.997,
+            epsilon=0.001,
             dtype=self.dtype,
         )
         backbone = partial(
@@ -113,6 +115,8 @@ class MobileNetV3(nn.Module):
 
         x = conv(self.last_block_filters, kernel_size=(1, 1), name="conv_2")(x)
         x = jnn.hard_swish(x)
+
+        x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
         x = conv(self.num_classes, kernel_size=(1, 1), name="conv_3")(x)
         x = x.reshape((x.shape[0], -1))  # flatten
