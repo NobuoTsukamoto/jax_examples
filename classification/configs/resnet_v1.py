@@ -23,7 +23,7 @@ def get_config():
     config.l2_weight_decay = 0.0
     config.warmup_epochs = 20.0
     config.momentum = 0.9
-    config.batch_size = 128
+    config.batch_size = 2048
     config.label_smoothing = 0.1
     config.model_ema_decay = 0.9999
     config.model_ema = True
@@ -35,7 +35,7 @@ def get_config():
     config.randaug_num_layers = 2
     config.randaug_magnitude = 9
     config.randaug_cutout_const = 40.0
-    config.randaug_translate_const = 10
+    config.randaug_translate_const = 250
     config.randaug_magnitude_std = 0.5
     config.randaug_prob_to_apply = None
     config.randaug_exclude_ops = None
