@@ -12,9 +12,7 @@ from typing import Any, Callable, Tuple, Optional
 
 import jax.numpy as jnp
 import jax.nn as jnn
-from jax import lax, random
 from flax import linen as nn
-import jax.numpy as jnp
 
 ModuleDef = Any
 
@@ -207,6 +205,9 @@ class BottleneckConvNeXtBlock(nn.Module):
             y = self.stochastic_depth(
                 stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
             )(y)
+        else:
+            lambda y: y
+
         return residual + y
 
 
@@ -221,7 +222,9 @@ class InvertedResBlock(nn.Module):
     conv: ModuleDef
     norm: ModuleDef
     act: Callable
+    stochastic_depth: ModuleDef = None
     dtype: Any = jnp.float32
+    stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, inputs):
@@ -266,6 +269,13 @@ class InvertedResBlock(nn.Module):
         x = self.norm(name=prefix + "project_bn")(x)
 
         if in_channels == pointwise_filters and self.strides == (1, 1):
+            if (
+                self.stochastic_depth_drop_rate > 0.0
+                and self.stochastic_depth is not None
+            ):
+                x = self.stochastic_depth(
+                    stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                )(x)
             x = x + inputs
 
         return x

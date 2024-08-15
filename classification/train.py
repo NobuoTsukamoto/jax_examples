@@ -110,6 +110,12 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
             end_value=config.end_learning_rate,
         )
 
+    elif config.optimizer_schedule == "cosine":
+        schedule_fn = optax.cosine_decay_schedule(
+            init_value=config.learning_rate,
+            decay_steps=config.num_epochs * steps_per_epoch,
+        )
+
     else:
         schedule_fn = optax.constant_schedule(config.learning_rate)
 
@@ -215,13 +221,12 @@ def train_step(
         metrics["scale"] = dynamic_scale.scale
 
     if ema_decay > 0.0:
-        new_state = new_state.replace(ema_params=new_state.apply_ema())
-        # new_state = jax.lax.cond(
-        #     step % gradient_accumulation_steps == 0,
-        #     lambda _: new_state.replace(ema_params=new_state.apply_ema()),
-        #     lambda _: new_state,
-        #    None,
-        # )
+        new_state = jax.lax.cond(
+            step % gradient_accumulation_steps == 0,
+            lambda _: new_state.replace(ema_params=new_state.apply_ema()),
+            lambda _: new_state,
+            None,
+        )
 
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 

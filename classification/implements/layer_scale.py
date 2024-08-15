@@ -8,7 +8,6 @@
 """
 
 from typing import Any
-from functools import partial
 
 import jax.numpy as jnp
 from flax import linen as nn
