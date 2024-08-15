@@ -9,12 +9,15 @@
 
 from functools import partial
 from typing import Any, Sequence, Optional, Tuple
-from .stochastic_depth import get_stochastic_depth_rate, StochasticDepth
-from .layer_scale import LayerScale
 
-from flax import linen as nn
-import jax.numpy as jnp
 import numpy as np
+
+import jax
+import jax.numpy as jnp
+from flax import linen as nn
+
+from .stochastic_depth import StochasticDepth
+from .layer_scale import LayerScale
 
 ModuleDef = Any
 
@@ -47,9 +50,9 @@ class ConvNeXtBackbone(nn.Module):
             96,
             kernel_size=(4, 4),
             strides=(4, 4),
-            name="conv_init",
+            name="Stem_Conv",
         )(x)
-        x = self.norm(name="ln_init")(x)
+        x = self.norm(name="Stem_Ln")(x)
 
         num_stage = 0
         for i, block_size in enumerate(self.stage_sizes):
@@ -62,6 +65,7 @@ class ConvNeXtBackbone(nn.Module):
                     self.num_filters[i],
                     kernel_size=(2, 2),
                     strides=(2, 2),
+                    name="Downsample_Conv_{:02}".format(i),
                 )(x)
 
             # stage
@@ -104,8 +108,9 @@ class ConvNeXt(nn.Module):
             )
         ]
 
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
-        linear = partial(nn.Dense, use_bias=False, dtype=self.dtype)
+        kernel_initializer = jax.nn.initializers.truncated_normal(stddev=0.02)
+        conv = partial(nn.Conv, kernel_init=kernel_initializer, dtype=self.dtype)
+        linear = partial(nn.Dense, kernel_init=kernel_initializer, dtype=self.dtype)
         norm = partial(
             nn.LayerNorm,
             epsilon=1e-6,
