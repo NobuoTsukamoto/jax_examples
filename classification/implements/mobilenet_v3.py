@@ -51,9 +51,9 @@ class MobileNetV3Backbone(nn.Module):
             first_block_filters,
             kernel_size=(3, 3),
             strides=(2, 2),
-            name="conv_init",
+            name="Stem_Conv",
         )(x)
-        x = self.norm()(x)
+        x = self.norm(name="Stem_Bn")(x)
         x = self.h_swish(x)
 
         for block_id, layer in self.layers.items():
@@ -64,7 +64,7 @@ class MobileNetV3Backbone(nn.Module):
                 strides=layer["strides"],
                 se_ratio=layer["se_ratio"],
                 act=self.h_swish if layer["h_swish"] else self.relu,
-                block_id=block_id,
+                block_id=int(block_id),
             )(x)
 
         if self.alpha > 1.0:

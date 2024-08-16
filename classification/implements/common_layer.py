@@ -305,18 +305,18 @@ class InvertedResBlockMobileNetV3(nn.Module):
             conv=self.conv,
         )
 
-        prefix = "block_{:02}_".format(self.block_id)
+        prefix = "Block_{:02}_".format(self.block_id)
 
         if self.block_id != 1:
             # Expand
             x = self.conv(
-                features=int(in_filters * self.expansion),
+                features=_make_divisible(in_filters * self.expansion),
                 kernel_size=(1, 1),
                 strides=(1, 1),
                 padding="SAME",
-                name=prefix + "expand",
+                name=prefix + "Expand_Conv",
             )(x)
-            x = self.norm(name=prefix + "expand_bn")(x)
+            x = self.norm(name=prefix + "Expand_Bn")(x)
             x = self.act(x)
 
         # Depthwise
@@ -327,9 +327,9 @@ class InvertedResBlockMobileNetV3(nn.Module):
             strides=self.strides,
             padding="SAME",
             feature_group_count=dw_filters,
-            name=prefix + "depthwise",
+            name=prefix + "DepthWise_Conv",
         )(x)
-        x = self.norm(name=prefix + "depthwise_bn")(x)
+        x = self.norm(name=prefix + "DepthWise_Bn")(x)
         x = self.act(x)
 
         if self.se_ratio:
@@ -344,11 +344,90 @@ class InvertedResBlockMobileNetV3(nn.Module):
             kernel_size=(1, 1),
             strides=(1, 1),
             padding="SAME",
-            name=prefix + "project",
+            name=prefix + "Project_Conv",
+        )(x)
+        x = self.norm(name=prefix + "Project_Bn")(x)
+
+        if in_filters == self.filters and self.strides == (1, 1):
+            x = x + inputs
+
+        return x
+
+
+class InvertedResBlockEfficientNet(nn.Module):
+    """Inverted ResNet block for EfficientNet."""
+
+    expansion: float
+    out_filters: int
+    kernel_size: Tuple[int, int]
+    strides: Tuple[int, int]
+    se_ratio: float
+    expand_ratio: int
+    block_id: int
+    conv: ModuleDef
+    norm: ModuleDef
+    stochastic_depth: ModuleDef = None
+    act: Callable = None
+    stochastic_depth_drop_rate: Optional[float] = 0.0
+    dtype: Any = jnp.float32
+
+    @nn.compact
+    def __call__(self, x):
+        inputs = x
+        in_filters = x.shape[-1]
+
+        se_bolock = partial(SeBlock, conv=self.conv, act1=jnn.swish, act2=jnn.sigmoid)
+
+        prefix = "block_{:02}_".format(self.block_id)
+        features = int(in_filters * self.expansion)
+
+        if self.expand_ratio != 1:
+            # Expand
+            x = self.conv(
+                features=features,
+                kernel_size=(1, 1),
+                strides=(1, 1),
+                padding="SAME",
+                name=prefix + "expand_conv",
+            )(x)
+            x = self.norm(name=prefix + "expand_bn")(x)
+            x = self.act(x)
+
+        # Depthwise
+        dw_filters = x.shape[-1]
+        x = self.conv(
+            features=dw_filters,
+            kernel_size=self.kernel_size,
+            strides=self.strides,
+            padding="SAME",
+            feature_group_count=dw_filters,
+            name=prefix + "depthwise_conv",
+        )(x)
+        x = self.norm(name=prefix + "depthwise_bn")(x)
+        x = self.act(x)
+
+        # Squeeze and Excitation
+        if self.se_ratio:
+            x = se_bolock(
+                filters=features,
+                se_ratio=self.se_ratio,
+            )(x)
+
+        # Project
+        x = self.conv(
+            features=self.out_filters,
+            kernel_size=(1, 1),
+            strides=(1, 1),
+            padding="SAME",
+            name=prefix + "project_conv",
         )(x)
         x = self.norm(name=prefix + "project_bn")(x)
 
-        if in_filters == self.filters and self.strides == (1, 1):
+        if in_filters == self.out_filters and self.strides == (1, 1):
+            if self.stochastic_depth_drop_rate > 0.0:
+                x = self.stochastic_depth(
+                    stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                )(x)
             x = x + inputs
 
         return x
@@ -398,9 +477,13 @@ class DepthwiseSeparable(nn.Module):
 
 
 class SeBlock(nn.Module):
+    """Squeeze-and-Excitation Networks"""
+
     filters: int
     se_ratio: int
     conv: ModuleDef
+    act1: Callable = nn.relu
+    act2: Callable = nn.hard_sigmoid
 
     @nn.compact
     def __call__(self, x):
@@ -412,9 +495,9 @@ class SeBlock(nn.Module):
         x = x.reshape(-1, 1, 1, in_filters)
 
         x = self.conv(filters, kernel_size=(1, 1), padding="same")(x)
-        x = nn.relu(x)
+        x = self.act1(x)
 
         x = self.conv(self.filters, kernel_size=(1, 1), padding="same")(x)
-        x = jnn.hard_sigmoid(x)
+        x = self.act2(x)
 
         return jnp.multiply(inputs, x)
