@@ -84,7 +84,7 @@ class MobileNetV1(nn.Module):
     depth_multiplier: float
     num_classes: int
     dtype: Any = jnp.float32
-    act: Callable = nn.relu
+    act: Callable = nn.relu6
     dropout_rate: Optional[float] = 0.2
     init_stochastic_depth_rate: Optional[float] = 0.0
 
@@ -94,8 +94,6 @@ class MobileNetV1(nn.Module):
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
-            momentum=0.9,
-            epsilon=1e-5,
             dtype=self.dtype,
         )
         backbone = partial(
