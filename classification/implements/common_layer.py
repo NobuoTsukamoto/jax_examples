@@ -222,7 +222,8 @@ class InvertedResBlock(nn.Module):
     conv: ModuleDef
     norm: ModuleDef
     act: Callable
-    stochastic_depth: ModuleDef = None
+    use_expand: Optional[bool] = True
+    stochastic_depth: Optional[ModuleDef] = None
     dtype: Any = jnp.float32
     stochastic_depth_drop_rate: Optional[float] = 0.0
 
@@ -235,15 +236,18 @@ class InvertedResBlock(nn.Module):
         pointwise_filters = _make_divisible(pointwise_conv_filters, 8)
 
         # Expand
-        x = self.conv(
-            features=in_channels * self.expansion,
-            kernel_size=(1, 1),
-            strides=(1, 1),
-            padding="SAME",
-            name=prefix + "expand",
-        )(inputs)
-        x = self.norm(name=prefix + "expand_bn")(x)
-        x = self.act(x)
+        if self.use_expand:
+            x = self.conv(
+                features=in_channels * self.expansion,
+                kernel_size=(1, 1),
+                strides=(1, 1),
+                padding="SAME",
+                name=prefix + "expand",
+            )(inputs)
+            x = self.norm(name=prefix + "expand_bn")(x)
+            x = self.act(x)
+        else:
+            x = inputs
 
         # Depthwise
         dw_filters = x.shape[-1]
@@ -251,7 +255,7 @@ class InvertedResBlock(nn.Module):
             features=dw_filters,
             kernel_size=(3, 3),
             strides=self.strides,
-            padding="SAME",
+            padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
             feature_group_count=dw_filters,
             name=prefix + "depthwise",
         )(x)

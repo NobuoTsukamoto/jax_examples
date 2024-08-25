@@ -32,7 +32,7 @@ class MobileNetV2Backbone(nn.Module):
     alpha: float
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
-    act: Callable = nn.relu
+    act: Callable = nn.relu6
 
     @nn.compact
     def __call__(self, x):
@@ -46,15 +46,21 @@ class MobileNetV2Backbone(nn.Module):
             first_block_filters,
             kernel_size=(3, 3),
             strides=(2, 2),
-            padding=[(3, 3), (3, 3)],
-            name="conv_init",
+            padding="SAME",
+            name="Stem_Conv",
         )(x)
-        x = self.norm()(x)
+        x = self.norm(name="Stem_Bn")(x)
         x = self.act(x)
 
         x = inverted_res_block(
-            filters=16, alpha=self.alpha, strides=(1, 1), expansion=1, block_id=0
+            filters=16,
+            alpha=self.alpha,
+            strides=(1, 1),
+            expansion=1,
+            block_id=0,
+            use_expand=False,
         )(x)
+
         x = inverted_res_block(
             filters=24, alpha=self.alpha, strides=(2, 2), expansion=6, block_id=1
         )(x)
@@ -137,8 +143,8 @@ class MobileNetV2(nn.Module):
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
-            momentum=0.9,
-            epsilon=1e-5,
+            momentum=0.999,
+            epsilon=1e-3,
             dtype=self.dtype,
         )
         backbone = partial(

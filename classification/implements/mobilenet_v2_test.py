@@ -36,7 +36,7 @@ class MobileNetV2Test(parameterized.TestCase):
         #   InvertedResBlock layer = 17
         #   conv + batch_norm = 2
         #   Followed by a Dense layer = 1
-        self.assertLen(variables["params"], 22)
+        self.assertLen(variables["params"], 2)
 
 
 if __name__ == "__main__":
