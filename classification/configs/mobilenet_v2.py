@@ -22,12 +22,14 @@ def get_config():
 
     config.optimizer_schedule = "warmup_exponential_decay"
     config.initial_learning_rate = 0.0
-    config.learning_rate = 0.128  # 0.008 * batch_size / 128
+    config.learning_rate = 0.256  # 0.008 * batch_size / 128
     config.warmup_epochs = 5
     config.exponential_decay_rate = 0.94
+    config.transition_steps = 780  # 2.5 * steps_per_epoch
+    config.lr_drop_staircase = True
 
     config.half_precision = True
-    config.batch_size = 2048
+    config.batch_size = 4096
 
     config.label_smoothing = 0.1
     config.l2_weight_decay = 0.00001
