@@ -95,9 +95,10 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
             init_value=config.initial_learning_rate,
             peak_value=config.learning_rate,
             warmup_steps=config.warmup_epochs * steps_per_epoch,
-            transition_steps=config.num_epochs * steps_per_epoch,
+            transition_steps=config.transition_steps,
             decay_rate=config.exponential_decay_rate,
-            staircase=False,
+            transition_begin=config.warmup_epochs * steps_per_epoch,
+            staircase=config.lr_drop_staircase,
         )
 
     elif config.optimizer_schedule == "warmup_cosine_decay":
