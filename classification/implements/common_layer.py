@@ -306,7 +306,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
 
         se_bolock = partial(
             SeBlock,
-            conv=self.conv,
+            conv=partial(nn.Conv, use_bias=True, dtype=self.dtype),
         )
 
         prefix = "Block_{:02}_".format(self.block_id)
@@ -329,7 +329,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
             features=dw_filters,
             kernel_size=self.kernel_size,
             strides=self.strides,
-            padding="SAME",
+            padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
             feature_group_count=dw_filters,
             name=prefix + "DepthWise_Conv",
         )(x)

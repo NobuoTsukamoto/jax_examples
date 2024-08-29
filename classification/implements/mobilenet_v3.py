@@ -96,8 +96,8 @@ class MobileNetV3(nn.Module):
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
-            momentum=0.997,
-            epsilon=0.001,
+            momentum=0.999,
+            epsilon=1e-3,
             dtype=self.dtype,
         )
         backbone = partial(
@@ -113,12 +113,14 @@ class MobileNetV3(nn.Module):
 
         x = jnp.mean(x, axis=(1, 2), keepdims=True)
 
-        x = conv(self.last_block_filters, kernel_size=(1, 1), name="conv_2")(x)
+        x = conv(
+            self.last_block_filters, kernel_size=(1, 1), use_bias=True, name="conv_2"
+        )(x)
         x = jnn.hard_swish(x)
 
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
-        x = conv(self.num_classes, kernel_size=(1, 1), name="conv_3")(x)
+        x = conv(self.num_classes, kernel_size=(1, 1), use_bias=True, name="conv_3")(x)
         x = x.reshape((x.shape[0], -1))  # flatten
 
         return jnp.asarray(x, self.dtype)
@@ -145,7 +147,7 @@ Large = {
 
 Small = {
     "1": {"exp": 1, "filters": 16, "kernel": (3, 3), "strides": (2, 2), "se_ratio": 0.25, "h_swish": False},
-    "2": {"exp": 4.5, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
+    "2": {"exp": 72. / 16, "filters": 24, "kernel": (3, 3), "strides": (2, 2), "se_ratio": None, "h_swish": False},
     "3": {"exp": 88. / 24, "filters": 24, "kernel": (3, 3), "strides": (1, 1), "se_ratio": None, "h_swish": False},
     "4": {"exp": 4, "filters": 40, "kernel": (5, 5), "strides": (2, 2), "se_ratio": 0.25, "h_swish": True},
     "5": {"exp": 6, "filters": 40, "kernel": (5, 5), "strides": (1, 1), "se_ratio": 0.25, "h_swish": True},
