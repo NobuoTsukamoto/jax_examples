@@ -55,9 +55,9 @@ class MobileNetV1Backbone(nn.Module):
             kernel_size=(3, 3),
             strides=(2, 2),
             padding="same",
-            name="conv_init",
+            name="Stem_Conv",
         )(x)
-        x = self.norm()(x)
+        x = self.norm()(x, name="Stem_BN")
         x = self.act(x)
 
         x = depthwise_separable_conv(64, strides=(1, 1))(x)

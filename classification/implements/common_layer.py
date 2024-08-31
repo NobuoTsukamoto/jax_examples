@@ -463,18 +463,18 @@ class DepthwiseSeparable(nn.Module):
             kernel_dilation=self.dilation,
             feature_group_count=in_features,
             padding=self.pad_type,
-            name="dw_conv",
+            name="DepthWise_Conv",
         )(x)
-        x = self.norm(name="dw_bn")(x)
+        x = self.norm(name="Depthwise_Bn")(x)
         x = self.act(x)
 
         x = self.conv(
             int(self.out_features * self.alpha),
             self.pw_kernel_size,
             padding=self.pad_type,
-            name="pw_conv",
+            name="PointWise_Conv",
         )(x)
-        x = self.norm(name="pw_bn")(x)
+        x = self.norm(name="PointWise_Bn")(x)
         x = self.act(x)
 
         return x

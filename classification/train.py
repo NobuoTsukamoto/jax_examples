@@ -178,7 +178,7 @@ def train_step(
             weight_l2 = sum(
                 jnp.sum(x[1] ** 2)
                 for x in weight_penalty_params
-                if x[1].ndim > 1 and "DepthwiseSeparable" not in x[0][0].key
+                if x[1].ndim > 1 and "DepthWise_Conv" not in x[0][0].key
             )
             weight_penalty = l2_weight_decay * 0.5 * weight_l2
             loss = loss + weight_penalty
