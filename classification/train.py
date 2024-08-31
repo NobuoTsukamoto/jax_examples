@@ -91,6 +91,19 @@ def compute_metrics(logits, labels, num_classes, label_smoothing=0.0):
 def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: int):
     """Create learning rate schedule."""
     if config.optimizer_schedule == "warmup_exponential_decay":
+        logging.info(
+            "LR Scheduler %s, init_value=%f, peak_value=%f, warmup_steps=%d,"
+            "transition_steps=%d, decay_rate=%f, transition_begin=%d, staircase=%s",
+            config.optimizer_schedule,
+            config.initial_learning_rate,
+            config.learning_rate,
+            config.warmup_epochs * steps_per_epoch,
+            config.transition_steps,
+            config.exponential_decay_rate,
+            config.warmup_epochs * steps_per_epoch,
+            config.lr_drop_staircase,
+        )
+
         schedule_fn = optax.warmup_exponential_decay_schedule(
             init_value=config.initial_learning_rate,
             peak_value=config.learning_rate,
@@ -359,10 +372,17 @@ def create_train_state(
         )
 
     elif config.optimizer == "rmsprop":
+        logging.info(
+            "Optimizer RMSProp: decay=%f, esp=%f, momentum=%f",
+            config.rmsprop_decay,
+            config.rmsprop_epsilon,
+            config.momentum,
+        )
+
         tx = optax.rmsprop(
             learning_rate=learning_rate_fn,
             decay=config.rmsprop_decay,
-            momentum=config.rmsprop_momentum,
+            momentum=config.momentum,
             eps=config.rmsprop_epsilon,
         )
 

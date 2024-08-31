@@ -19,7 +19,7 @@ def get_config():
     config.image_size = 224
 
     # `name` argument of tensorflow_datasets.builder()
-    config.dataset = "imagenette/full-size-v2:1.*.*"
+    config.dataset = "imagenet2012:5.*.*"
     config.dataset_dir = "/workdir/tensorflow_datasets/"
 
     # optimizer
@@ -35,6 +35,8 @@ def get_config():
     config.batch_size = 64
     config.label_smoothing = 0.0
     config.l2_weight_decay = 0.0001
+    config.transition_steps = 0
+    config.lr_drop_staircase = False
 
     config.num_epochs = 100.0
     config.log_every_steps = 100
