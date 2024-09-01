@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -35,7 +35,7 @@ from implements.ff_net import (
 )
 from implements.dab_net import DABNet
 from implements.led_net import LEDNet
-from implements.common_layer import ResNetBlock
+from common_layer import ResNetBlock
 
 # FastSCNN
 Fast_SCNN = partial(FastSCNN)

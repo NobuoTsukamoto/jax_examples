@@ -15,7 +15,7 @@ import jax.numpy as jnp
 import jax.nn as jnn
 from flax import linen as nn
 
-from .common_layer import _make_divisible, SeBlock
+from common_layer import _make_divisible, SeBlock
 
 ModuleDef = Any
 

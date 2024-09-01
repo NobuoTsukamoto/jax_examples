@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -14,9 +14,7 @@ from typing import Any, Dict
 import jax
 import jax.numpy as jnp
 import ml_collections
-import optax
 import orbax
-import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from absl import logging
@@ -32,6 +30,9 @@ import input_pipeline
 import models
 from miou_metrics import eval_semantic_segmentation
 from loss import create_loss_fn
+
+from optimizer import create_learning_rate_fn, create_optimizer
+from utils import get_input_dtype
 
 
 def create_model(*, model_cls, half_precision, num_classes, output_size, **kwargs):
@@ -83,26 +84,6 @@ def compute_metrics(logits, labels, loss_fn, num_classes, ignore_label):
     return metrics
 
 
-def create_learning_rate_fn(
-    config: ml_collections.ConfigDict, base_learning_rate: float, steps_per_epoch: int
-):
-    """Create learning rate schedule."""
-    warmup_fn = optax.linear_schedule(
-        init_value=0.0,
-        end_value=base_learning_rate,
-        transition_steps=config.warmup_epochs * steps_per_epoch,
-    )
-    cosine_epochs = max(config.num_epochs - config.warmup_epochs, 1)
-    cosine_fn = optax.cosine_decay_schedule(
-        init_value=base_learning_rate, decay_steps=cosine_epochs * steps_per_epoch
-    )
-    schedule_fn = optax.join_schedules(
-        schedules=[warmup_fn, cosine_fn],
-        boundaries=[config.warmup_epochs * steps_per_epoch],
-    )
-    return schedule_fn
-
-
 def train_step(
     state,
     batch,
@@ -136,7 +117,7 @@ def train_step(
             weight_l2 = sum(
                 jnp.sum(x[1] ** 2)
                 for x in weight_penalty_params
-                if x[1].ndim > 1 and "DepthwiseSeparable" not in x[0][0].key
+                if x[1].ndim > 1 and "DepthWise_Conv" not in x[0][0].key
             )
             weight_penalty = weight_decay * 0.5 * weight_l2
         loss = loss + aux_loss + weight_penalty
@@ -263,19 +244,6 @@ def restore_checkpoint(checkpoint_manager, state):
         return state
 
 
-def get_input_dtype(half_precision):
-    platform = jax.local_devices()[0].platform
-    if half_precision:
-        if platform == "tpu":
-            input_dtype = tf.bfloat16
-        else:
-            input_dtype = tf.float16
-    else:
-        input_dtype = tf.float32
-
-    return input_dtype
-
-
 def save_checkpoint(checkpoint_manager, state):
     if jax.process_index() == 0:
         # get train state from the first replica
@@ -313,17 +281,7 @@ def create_train_state(
         dynamic_scale = None
 
     params, batch_stats = initialized(rngs, image_size, model)
-    if config.optimizer == "adamw":
-        tx = optax.adamw(
-            learning_rate=learning_rate_fn,
-        )
-
-    elif config.optimizer == "sgd":
-        tx = optax.sgd(
-            learning_rate=learning_rate_fn,
-            momentum=config.momentum,
-            nesterov=True,
-        )
+    tx = create_optimizer(config, learning_rate_fn)
 
     state = TrainState.create(
         apply_fn=model.apply,
@@ -416,10 +374,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
         output_size=output_size,
     )
 
-    base_learning_rate = config.learning_rate
-    learning_rate_fn = create_learning_rate_fn(
-        config, base_learning_rate, steps_per_epoch
-    )
+    learning_rate_fn = create_learning_rate_fn(config, steps_per_epoch)
 
     checkpoint_manager_options = orbax.checkpoint.CheckpointManagerOptions(
         create=True, max_to_keep=3
@@ -507,7 +462,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             eval_metrics = common_utils.get_metrics(eval_metrics)
             summary = jax.tree_util.tree_map(lambda x: x.mean(), eval_metrics)
             logging.info(
-                "eval epoch: %d, loss: %.4f, miou: %.4f, class accuracy: %.4f, pixel accuracy: %.4f",
+                "eval epoch: %d, loss: %.4f, miou: %.4f, "
+                "class accuracy: %.4f, pixel accuracy: %.4f",
                 epoch,
                 summary["loss"],
                 summary["miou"],

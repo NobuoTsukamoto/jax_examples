@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -201,7 +201,6 @@ def ohem_cross_entropy_loss(
     loss = loss * weight_mask
     loss = loss * valid_mask
     return jnp.mean(loss) / (jnp.mean(valid_mask) + epsilon)
-     
 
 
 def recall_cross_entroy_loss(

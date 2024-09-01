@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -48,5 +48,26 @@ def get_config():
 
     config.loss = "cross_entropy_loss"
     config.label_smoothing = 0.0
+
+    # optimizer
+    config.optimizer = "sgd"
+    config.optimizer_schedule = "warmup_cosine_decay"
+    config.weight_decay = 0.0001
+    config.initial_learning_rate = 0.0
+    config.learning_rate = 0.1
+    config.end_learning_rate = 0.0
+    config.exponential_decay_rate = 0.0
+    config.warmup_epochs = 5.0
+    config.momentum = 0.9
+    config.batch_size = 64
+    config.label_smoothing = 0.0
+    config.l2_weight_decay = 0.0001
+    config.transition_steps = 0
+    config.lr_drop_staircase = False
+
+    config.model_ema = False
+    config.model_ema_decay = 0.0
+
+    config.gradient_accumulation_steps = 1
 
     return config

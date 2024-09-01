@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
-import math
 
 import numpy as np
 import jax
@@ -23,8 +22,8 @@ import tensorflow_datasets as tfds
 """
 
 IMAGE_SIZE = (1024, 2048)
-MEAN_RGB = [0.485, 0.456, 0.406]
-STDDEV_RGB = [0.229, 0.224, 0.225]
+MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
+STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
 
 # fmt: off
 # https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py#L52-L99
@@ -44,9 +43,7 @@ def _prepare_image_and_label(datapoint, input_image_size):
     image = tf.io.decode_image(datapoint["image_left"], 3, dtype=tf.uint8)
     image = tf.reshape(image, (input_image_size[0], input_image_size[1], 3))
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-    image = tfm.vision.preprocess_ops.normalize_image(
-        image, MEAN_RGB, STDDEV_RGB
-    )
+    image = tfm.vision.preprocess_ops.normalize_image(image, MEAN_RGB, STDDEV_RGB)
 
     label = tf.cast(label, dtype=tf.int32)
     label = tf.where(label >= 34, 34, label)
@@ -91,7 +88,12 @@ def parse_train_data(
     train_image_size = crop_size if crop_size else output_image_size
     # Resizes and crops image.
     image, image_info = tfm.vision.preprocess_ops.resize_and_crop_image(
-        image, train_image_size, train_image_size, aug_scale_min, aug_scale_max
+        image,
+        train_image_size,
+        train_image_size,
+        aug_scale_min=aug_scale_min,
+        aug_scale_max=aug_scale_max,
+        centered_crop=False,
     )
 
     # Resizes and crops boxes.
@@ -103,7 +105,7 @@ def parse_train_data(
     label += 1
     label = tf.expand_dims(label, axis=3)
     label = tfm.vision.preprocess_ops.resize_and_crop_masks(
-        label, image_scale, train_image_size, offset
+        label, image_scale, train_image_size, offset, centered_crop=False
     )
 
     label -= 1
