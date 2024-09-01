@@ -19,13 +19,13 @@ def get_config():
     config.image_size = 224
 
     # `name` argument of tensorflow_datasets.builder()
-    config.dataset = "imagenet2012:5.*.*"
+    config.dataset = "imagenette/full-size-v2:1.*.*"
     config.dataset_dir = "/workdir/tensorflow_datasets/"
 
     # optimizer
     config.optimizer = "sgd"
     config.optimizer_schedule = "warmup_cosine_decay"
-    config.adamw_weight_decay = 0.0001
+    config.weight_decay = 0.0001
     config.initial_learning_rate = 0.0
     config.learning_rate = 0.1
     config.end_learning_rate = 0.0

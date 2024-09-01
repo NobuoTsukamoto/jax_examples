@@ -16,8 +16,8 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 
-from .stochastic_depth import StochasticDepth
-from .layer_scale import LayerScale
+from stochastic_depth import StochasticDepth
+from layer_scale import LayerScale
 
 ModuleDef = Any
 

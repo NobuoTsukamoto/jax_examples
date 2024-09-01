@@ -20,7 +20,7 @@ def get_config():
     config.optimizer = "adamw"
     config.learning_rate = 0.004
     config.end_learning_rate = 1e-6
-    config.adamw_weight_decay = 0.05
+    config.weight_decay = 0.05
     config.l2_weight_decay = 0.0
     config.warmup_epochs = 20.0
     config.momentum = 0.9

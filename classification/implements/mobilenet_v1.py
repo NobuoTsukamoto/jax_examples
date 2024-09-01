@@ -13,7 +13,7 @@ from typing import Any, Callable, Optional
 import jax.numpy as jnp
 from flax import linen as nn
 
-from .common_layer import DepthwiseSeparable
+from common_layer import DepthwiseSeparable
 
 ModuleDef = Any
 
@@ -57,7 +57,7 @@ class MobileNetV1Backbone(nn.Module):
             padding="same",
             name="Stem_Conv",
         )(x)
-        x = self.norm()(x, name="Stem_BN")
+        x = self.norm(name="Stem_BN")(x)
         x = self.act(x)
 
         x = depthwise_separable_conv(64, strides=(1, 1))(x)

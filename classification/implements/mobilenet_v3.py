@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import jax.nn as jnn
 from flax import linen as nn
 
-from .common_layer import _make_divisible, InvertedResBlockMobileNetV3
+from common_layer import _make_divisible, InvertedResBlockMobileNetV3
 
 ModuleDef = Any
 

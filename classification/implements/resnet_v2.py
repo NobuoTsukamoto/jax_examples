@@ -13,7 +13,7 @@ from typing import Any, Callable, Dict
 import jax.numpy as jnp
 from flax import linen as nn
 
-from .common_layer import ResidualBlockV2
+from common_layer import ResidualBlockV2
 
 ModuleDef = Any
 

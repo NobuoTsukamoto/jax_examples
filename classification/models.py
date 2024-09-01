@@ -16,7 +16,7 @@ from implements.resnet_v1 import ResNet
 from implements.convnext import ConvNeXt
 from implements.vit import ViT
 
-from implements.common_layer import (
+from common_layer import (
     ResNetBlock,
     BottleneckResNetBlock,
     BottleneckConvNeXtBlock,
@@ -24,7 +24,6 @@ from implements.common_layer import (
 
 # MobileNetV1 alpha=1.0 depth_multiplier=1.0
 MobileNetV1_10 = partial(MobileNetV1, alpha=1.0, depth_multiplier=1.0)
-
 
 # MobileNetV2
 MobileNetV2_10 = partial(MobileNetV2, alpha=1.0)

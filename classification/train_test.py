@@ -54,10 +54,25 @@ class TrainTest(parameterized.TestCase):
         config.num_train_steps = 1
         config.steps_per_eval = 1
 
+        # optimizer config
+        config.optimizer = "rmsprop"
+        config.rmsprop_decay = 0.9
+        config.rmsprop_epsilon = 0.002
+        config.momentum = 0.9
+
+        # LR scheduler config
+        config.optimizer_schedule = "warmup_exponential_decay"
+        config.initial_learning_rate = 0.0
+        config.learning_rate = 0.064  # 0.008 * batch_size / 128
+        config.warmup_epochs = 5
+        config.exponential_decay_rate = 0.94
+        config.transition_steps = 3127  # 2.5 * steps_per_epoch
+        config.lr_drop_staircase = True
+
         with tfds.testing.mock_data(
             num_examples=1,
             policy=tfds.testing.MockPolicy.USE_FILES,
-            data_dir="~/tensorflow_datasets",
+            data_dir="/workdir/tensorflow_datasets",
         ):
             train.train_and_evaluate(workdir=workdir, config=config)
 

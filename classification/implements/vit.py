@@ -14,7 +14,7 @@ from flax import linen as nn
 import jax
 import jax.numpy as jnp
 
-from .stochastic_depth import get_stochastic_depth_rate, StochasticDepth
+from stochastic_depth import get_stochastic_depth_rate, StochasticDepth
 
 ModuleDef = Any
 

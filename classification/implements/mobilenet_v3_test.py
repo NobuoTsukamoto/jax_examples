@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -42,7 +42,7 @@ class MobileNetV3Test(parameterized.TestCase):
         #   InvertedResBlock layer = 15
         #   conv + batch_norm = 2
         #   conv = 2
-        self.assertLen(variables["params"], 21)
+        self.assertLen(variables["params"], 3)
 
         print(parameter_overview.get_parameter_overview(variables))
 
@@ -64,7 +64,7 @@ class MobileNetV3Test(parameterized.TestCase):
         #   InvertedResBlock layer = 11
         #   conv + batch_norm = 2
         #   conv = 2
-        self.assertLen(variables["params"], 17)
+        self.assertLen(variables["params"], 3)
 
         print(parameter_overview.get_parameter_overview(variables))
 

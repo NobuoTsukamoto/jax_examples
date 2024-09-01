@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2022 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -17,7 +17,6 @@ import jax.numpy as jnp
 import ml_collections
 import models
 import optax
-import tensorflow as tf
 import tensorflow_datasets as tfds
 from absl import logging
 from clu import metric_writers, periodic_actions
@@ -27,6 +26,9 @@ from flax.training import common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
 from flax.training import train_state
 from jax import lax
+
+from optimizer import create_learning_rate_fn, create_optimizer
+from utils import get_input_dtype
 
 """ Training Image classfication model.
 
@@ -86,53 +88,6 @@ def compute_metrics(logits, labels, num_classes, label_smoothing=0.0):
     }
     metrics = lax.pmean(metrics, axis_name="batch")
     return metrics
-
-
-def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: int):
-    """Create learning rate schedule."""
-    if config.optimizer_schedule == "warmup_exponential_decay":
-        logging.info(
-            "LR Scheduler %s, init_value=%f, peak_value=%f, warmup_steps=%d,"
-            "transition_steps=%d, decay_rate=%f, transition_begin=%d, staircase=%s",
-            config.optimizer_schedule,
-            config.initial_learning_rate,
-            config.learning_rate,
-            config.warmup_epochs * steps_per_epoch,
-            config.transition_steps,
-            config.exponential_decay_rate,
-            config.warmup_epochs * steps_per_epoch,
-            config.lr_drop_staircase,
-        )
-
-        schedule_fn = optax.warmup_exponential_decay_schedule(
-            init_value=config.initial_learning_rate,
-            peak_value=config.learning_rate,
-            warmup_steps=config.warmup_epochs * steps_per_epoch,
-            transition_steps=config.transition_steps,
-            decay_rate=config.exponential_decay_rate,
-            transition_begin=config.warmup_epochs * steps_per_epoch,
-            staircase=config.lr_drop_staircase,
-        )
-
-    elif config.optimizer_schedule == "warmup_cosine_decay":
-        schedule_fn = optax.warmup_cosine_decay_schedule(
-            init_value=config.initial_learning_rate,
-            peak_value=config.learning_rate,
-            warmup_steps=config.warmup_epochs * steps_per_epoch,
-            decay_steps=config.num_epochs * steps_per_epoch,
-            end_value=config.end_learning_rate,
-        )
-
-    elif config.optimizer_schedule == "cosine":
-        schedule_fn = optax.cosine_decay_schedule(
-            init_value=config.learning_rate,
-            decay_steps=config.num_epochs * steps_per_epoch,
-        )
-
-    else:
-        schedule_fn = optax.constant_schedule(config.learning_rate)
-
-    return schedule_fn
 
 
 def train_step(
@@ -326,19 +281,6 @@ def save_checkpoint(state, workdir):
     checkpoints.save_checkpoint_multiprocess(workdir, state, step, keep=3)
 
 
-def get_input_dtype(half_precision):
-    platform = jax.local_devices()[0].platform
-    if half_precision:
-        if platform == "tpu":
-            input_dtype = tf.bfloat16
-        else:
-            input_dtype = tf.float16
-    else:
-        input_dtype = tf.float32
-
-    return input_dtype
-
-
 # pmean only works inside pmap because it needs an axis name.
 # This function will average the inputs across all devices.
 cross_replica_mean = jax.pmap(lambda x: lax.pmean(x, "x"), "x")
@@ -366,45 +308,7 @@ def create_train_state(
         dynamic_scale = None
 
     params, batch_stats = initialized(rngs, config.image_size, model)
-    if config.optimizer == "adamw":
-        tx = optax.adamw(
-            learning_rate=learning_rate_fn, weight_decay=config.adamw_weight_decay
-        )
-
-    elif config.optimizer == "rmsprop":
-        logging.info(
-            "Optimizer RMSProp: decay=%f, esp=%f, momentum=%f",
-            config.rmsprop_decay,
-            config.rmsprop_epsilon,
-            config.momentum,
-        )
-
-        tx = optax.rmsprop(
-            learning_rate=learning_rate_fn,
-            decay=config.rmsprop_decay,
-            momentum=config.momentum,
-            eps=config.rmsprop_epsilon,
-        )
-
-    elif config.optimizer == "sgd":
-        tx = optax.sgd(
-            learning_rate=learning_rate_fn,
-            momentum=config.momentum,
-            nesterov=True,
-        )
-
-    if config.model_ema_decay > 0.0:
-        logging.info(
-            "Decay rate for the exponential moving average. : %f",
-            config.model_ema_decay,
-        )
-
-    if config.gradient_accumulation_steps > 1:
-        logging.info(
-            "Gradient accumulation steps. : %d",
-            config.gradient_accumulation_steps,
-        )
-        tx = optax.MultiSteps(tx, config.gradient_accumulation_steps)
+    tx = create_optimizer(config, learning_rate_fn)
 
     if batch_stats is not None:
         state = TrainStateWithBatchNorm.create(

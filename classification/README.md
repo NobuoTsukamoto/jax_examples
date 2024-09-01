@@ -10,7 +10,10 @@ It is based on flax's ImageNet classification sample.
 
 ### Running locally
 ```
-python main.py --workdir=./train_dir --config=configs/default.py
+cd jax_example
+export PYTHONPATH=`pwd`/common:$PYTHONPATH
+cd classification/
+python main.py --task train --config configs/`config_file` --workdir `full path for workdir`
 ```
 
 ### Models

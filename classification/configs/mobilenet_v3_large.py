@@ -18,7 +18,7 @@ def get_config():
     config.model = "MobileNetV3_Large"
 
     config.optimizer = "adamw"
-    config.adamw_weight_decay = 0.05
+    config.weight_decay = 0.05
 
     config.batch_size = 64
     config.label_smoothing = 0.1

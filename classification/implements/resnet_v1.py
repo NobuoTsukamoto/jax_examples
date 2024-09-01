@@ -9,7 +9,7 @@
 
 from functools import partial
 from typing import Any, Callable, Sequence, Optional
-from .stochastic_depth import get_stochastic_depth_rate, StochasticDepth
+from stochastic_depth import get_stochastic_depth_rate, StochasticDepth
 
 from flax import linen as nn
 import jax.numpy as jnp
