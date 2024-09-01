@@ -17,22 +17,21 @@ import train
 import summary
 
 flags.DEFINE_enum(
-    "task",
-    "train",
-    [
+    name="task",
+    default="summarize",
+    enum_values=[
         "train",
         "summarize",
     ],
-    "Select task to perform.",
+    help="Select task to perform.",
 )
-flags.DEFINE_string("workdir", None, "Directory to store model data.")
+flags.DEFINE_string(name="workdir", default=None, help="Directory to store model data.")
 config_flags.DEFINE_config_file(
-    "config",
-    None,
-    "File path to the training hyperparameter configuration.",
+    name="config",
+    default=None,
+    help_string="File path to the training hyperparameter configuration.",
     lock_config=True,
 )
-flags.DEFINE_bool("non_batchnorm", False, "Use LayerNorm or GroupNorm.")
 
 FLAGS = flags.FLAGS
 
@@ -69,5 +68,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    flags.mark_flags_as_required(["task", "config"])
+    flags.mark_flags_as_required(["config"])
     app.run(main)
