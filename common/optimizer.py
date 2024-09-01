@@ -15,8 +15,12 @@ from absl import logging
 def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: int):
     """Create learning rate schedule."""
 
-    warmup_steps = config.warmup_epochs * steps_per_epoch
-    decay_steps = config.num_epochs * steps_per_epoch
+    warmup_steps = config.warmup_epochs * (
+        steps_per_epoch // config.gradient_accumulation_steps
+    )
+    decay_steps = config.num_epochs * (
+        steps_per_epoch // config.gradient_accumulation_steps
+    )
 
     logging.info(
         "Learning Rate Scheduler: %s, init_value=%f, peak_value=%f, warmup_steps=%d, "

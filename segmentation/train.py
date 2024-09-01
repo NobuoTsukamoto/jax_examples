@@ -93,6 +93,7 @@ def train_step(
     ignore_label,
     weight_decay=None,
     dropout_rng=None,
+    gradient_accumulation_steps=1,
 ):
     """Perform a single training step."""
 
@@ -126,7 +127,7 @@ def train_step(
     step = state.step
     dynamic_scale = state.dynamic_scale
     if learning_rate_fn is not None:
-        lr = learning_rate_fn(step)
+        lr = learning_rate_fn(step // gradient_accumulation_steps)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(
@@ -401,6 +402,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             num_classes=num_classes,
             ignore_label=config.ignore_label,
             weight_decay=config.weight_decay,
+            gradient_accumulation_steps=config.gradient_accumulation_steps,
         ),
         axis_name="batch",
     )
