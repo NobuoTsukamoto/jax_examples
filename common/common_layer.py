@@ -450,7 +450,6 @@ class DepthwiseSeparable(nn.Module):
     pw_kernel_size: Tuple[int, int] = (1, 1)
     strides: Tuple[int, int] = (1, 1)
     dilation: Tuple[int, int] = (1, 1)
-    pad_type: str = "SAME"
 
     @nn.compact
     def __call__(self, x):
@@ -462,7 +461,8 @@ class DepthwiseSeparable(nn.Module):
             strides=self.strides,
             kernel_dilation=self.dilation,
             feature_group_count=in_features,
-            padding=self.pad_type,
+            padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
+            use_bias=False,
             name="DepthWise_Conv",
         )(x)
         x = self.norm(name="Depthwise_Bn")(x)
@@ -471,7 +471,8 @@ class DepthwiseSeparable(nn.Module):
         x = self.conv(
             int(self.out_features * self.alpha),
             self.pw_kernel_size,
-            padding=self.pad_type,
+            padding="SAME",
+            use_bias=False,
             name="PointWise_Conv",
         )(x)
         x = self.norm(name="PointWise_Bn")(x)

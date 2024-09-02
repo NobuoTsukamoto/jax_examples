@@ -35,7 +35,7 @@ class MobileNetV1Backbone(nn.Module):
     num_classes: int
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
-    act: Callable = nn.relu
+    act: Callable = nn.relu6
     dtype: Any = jnp.float32
 
     @nn.compact
@@ -55,6 +55,7 @@ class MobileNetV1Backbone(nn.Module):
             kernel_size=(3, 3),
             strides=(2, 2),
             padding="same",
+            use_bias=False,
             name="Stem_Conv",
         )(x)
         x = self.norm(name="Stem_BN")(x)
@@ -90,7 +91,7 @@ class MobileNetV1(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        conv = partial(nn.Conv, dtype=self.dtype)
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
