@@ -241,13 +241,14 @@ def create_split(
     options.threading.private_threadpool_size = 48
     ds = ds.with_options(options)
 
-    ds = ds.map(decode_example, num_parallel_calls=tf.data.AUTOTUNE)
     if config.cache:
         ds = ds.cache()
+
     if train:
         ds = ds.repeat()
-        ds = ds.shuffle(32 * batch_size, seed=config.seed)
+        ds = ds.shuffle(config.shuffle_buffer_size, seed=config.seed)
 
+    ds = ds.map(decode_example, num_parallel_calls=tf.data.AUTOTUNE)
     ds = ds.batch(batch_size, drop_remainder=True)
 
     if train and postprocess_fn is not None:
@@ -256,6 +257,6 @@ def create_split(
     if not train:
         ds = ds.repeat()
 
-    ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+    ds = ds.prefetch(config.prefetch)
 
     return ds
