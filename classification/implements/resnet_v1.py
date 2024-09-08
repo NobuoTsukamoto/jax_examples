@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -21,6 +21,8 @@ ModuleDef = Any
     Reference:
         Deep Residual Learning for Image Recognition
         https://arxiv.org/abs/1512.03385
+
+        https://github.com/google/flax/tree/main/examples/imagenet
 """
 
 
@@ -43,10 +45,10 @@ class ResNetBackbone(nn.Module):
             kernel_size=(7, 7),
             strides=(2, 2),
             padding=[(3, 3), (3, 3)],
-            name="conv_init",
+            name="Stem_Conv",
         )(x)
 
-        x = self.norm(name="bn_init")(x)
+        x = self.norm(name="Stem_Bn")(x)
         x = self.act(x)
         x = nn.max_pool(x, window_shape=(3, 3), strides=(2, 2), padding="SAME")
 
@@ -107,6 +109,6 @@ class ResNet(nn.Module):
         )(x)
 
         x = jnp.mean(x, axis=(1, 2))
-        x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
+        x = nn.Dense(self.num_classes, name="Head", dtype=self.dtype)(x)
         x = jnp.asarray(x, self.dtype)
         return x

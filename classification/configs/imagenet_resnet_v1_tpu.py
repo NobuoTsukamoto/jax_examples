@@ -32,4 +32,6 @@ def get_config():
 
     config.num_epochs = 100
 
+    config.init_stochastic_depth_rate = 0.0
+
     return config
