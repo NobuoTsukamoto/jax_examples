@@ -28,7 +28,7 @@ def get_config():
 
     config.cache = True
     config.half_precision = True
-    config.batch_size = 128
+    config.batch_size = 2048
 
     config.num_epochs = 100
 
