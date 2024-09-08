@@ -142,25 +142,27 @@ class BottleneckResNetBlock(nn.Module):
 
     @nn.compact
     def __call__(self, x):
+
         residual = x
-        y = self.conv(self.features, (1, 1))(x)
-        y = self.norm()(y)
+        y = self.conv(self.features, (1, 1), name="Conv_0")(x)
+        y = self.norm(name="BN_0")(y)
         y = self.act(y)
-        y = self.conv(self.features, (3, 3), self.strides)(y)
-        y = self.norm()(y)
+        y = self.conv(self.features, (3, 3), self.strides, name="Conv_1")(y)
+        y = self.norm(name="BN_1")(y)
         y = self.act(y)
-        y = self.conv(self.features * 4, (1, 1))(y)
-        y = self.norm(scale_init=nn.initializers.zeros_init())(y)
+        y = self.conv(self.features * 4, (1, 1), name="Conv_2")(y)
+        y = self.norm(scale_init=nn.initializers.zeros_init(), name="BN_2")(y)
 
         if residual.shape != y.shape:
             residual = self.conv(
-                self.features * 4, (1, 1), self.strides, name="conv_proj"
+                self.features * 4, (1, 1), self.strides, name="Project_Conv"
             )(residual)
-            residual = self.norm(name="norm_proj")(residual)
+            residual = self.norm(name="Project_Bn")(residual)
 
         if self.stochastic_depth_drop_rate > 0.0:
             y = self.stochastic_depth(
-                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate,
+                name="Stochastic_Depth",
             )(y)
         return self.act(residual + y)
 
