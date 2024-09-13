@@ -14,7 +14,7 @@ I will be adding mainly computer vision tasks. I will start with code for model 
   - [x] Segmentation model (LR-RASPP).
   - [ ] Object detection model.
   - [ ] GAN model.
-- [ ] Training with Colab TPU.
+- [x] Training with Colab TPU.
 
 
 # Reference
