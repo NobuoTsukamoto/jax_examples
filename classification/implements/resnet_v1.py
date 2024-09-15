@@ -84,7 +84,7 @@ class ResNet(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        conv = partial(nn.Conv, use_bias=True, dtype=self.dtype)
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
