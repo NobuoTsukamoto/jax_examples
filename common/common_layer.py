@@ -45,21 +45,24 @@ class ResNetBlock(nn.Module):
     @nn.compact
     def __call__(self, x):
         residual = x
-        y = self.conv(self.features, kernel_size=(3, 3), strides=self.strides)(x)
+        y = self.conv(
+            self.features, kernel_size=(3, 3), strides=self.strides, name="Conv_0"
+        )(x)
         y = self.norm()(y)
         y = self.act(y)
-        y = self.conv(self.features, kernel_size=(3, 3))(y)
+        y = self.conv(self.features, kernel_size=(3, 3), name="Conv_1")(y)
         y = self.norm(scale_init=nn.initializers.zeros_init())(y)
 
         if residual.shape != y.shape:
-            residual = self.conv(self.features, (1, 1), self.strides, name="conv_proj")(
-                residual
-            )
-            residual = self.norm(name="norm_proj")(residual)
+            residual = self.conv(
+                self.features, (1, 1), self.strides, name="Project_Conv"
+            )(residual)
+            residual = self.norm()(residual)
 
         if self.stochastic_depth_drop_rate > 0.0:
             y = self.stochastic_depth(
-                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate,
+                name="Stochastic_Depth",
             )(y)
 
         return self.act(residual + y)
@@ -72,14 +75,13 @@ class ResidualBlockV2(nn.Module):
     conv: ModuleDef
     norm: ModuleDef
     act: Callable
-    name: str
     strides: Tuple[int, int] = None
     is_conv_shortcut: bool = False
     dtype: Any = jnp.float32
 
     @nn.compact
     def __call__(self, inputs):
-        pre = self.norm(name=self.name + "_preact_bn")(inputs)
+        pre = self.norm()(inputs)
         pre = self.act(pre)
 
         if self.is_conv_shortcut:
@@ -88,7 +90,7 @@ class ResidualBlockV2(nn.Module):
                 kernel_size=(1, 1),
                 strides=self.strides,
                 padding="SAME",
-                name=self.name + "_0_conv",
+                name="Conv_Shortcut",
             )(pre)
 
         elif self.strides is not None:
@@ -102,9 +104,9 @@ class ResidualBlockV2(nn.Module):
             kernel_size=(1, 1),
             strides=(1, 1),
             padding="SAME",
-            name=self.name + "_1_conv",
+            name="Conv_1",
         )(pre)
-        x = self.norm(name=self.name + "_1_bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         x = self.conv(
@@ -112,9 +114,9 @@ class ResidualBlockV2(nn.Module):
             kernel_size=(3, 3),
             strides=(1, 1),
             padding="SAME",
-            name=self.name + "_2_conv",
+            name="Conv_2",
         )(x)
-        x = self.norm(name=self.name + "_2_bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         x = self.conv(
@@ -122,7 +124,7 @@ class ResidualBlockV2(nn.Module):
             kernel_size=(1, 1),
             strides=self.strides,
             padding="SAME",
-            name=self.name + "_3_conv",
+            name="Conv_3",
         )(x)
         x = shortcut + x
 
@@ -145,19 +147,19 @@ class BottleneckResNetBlock(nn.Module):
 
         residual = x
         y = self.conv(self.features, (1, 1), name="Conv_0")(x)
-        y = self.norm(name="BN_0")(y)
+        y = self.norm()(y)
         y = self.act(y)
         y = self.conv(self.features, (3, 3), self.strides, name="Conv_1")(y)
-        y = self.norm(name="BN_1")(y)
+        y = self.norm()(y)
         y = self.act(y)
         y = self.conv(self.features * 4, (1, 1), name="Conv_2")(y)
-        y = self.norm(scale_init=nn.initializers.zeros_init(), name="BN_2")(y)
+        y = self.norm(scale_init=nn.initializers.zeros_init())(y)
 
         if residual.shape != y.shape:
             residual = self.conv(
                 self.features * 4, (1, 1), self.strides, name="Project_Conv"
             )(residual)
-            residual = self.norm(name="Project_Bn")(residual)
+            residual = self.norm()(residual)
 
         if self.stochastic_depth_drop_rate > 0.0:
             y = self.stochastic_depth(
@@ -192,20 +194,21 @@ class BottleneckConvNeXtBlock(nn.Module):
             strides=self.strides,
             padding="SAME",
             feature_group_count=dw_filters,
+            name="DepthWise_Conv_0",
         )(x)
         y = self.norm()(y)
 
         # y = self.conv(self.features * 4, (1, 1))(y)
-        y = self.linear(self.features * 4)(y)
+        y = self.linear(self.features * 4, name="Conv_1")(y)
         y = self.act(y)
 
         # y = self.conv(self.features, (1, 1))(y)
-        y = self.linear(self.features)(y)
+        y = self.linear(self.features, name="Conv_2")(y)
 
         y = self.layer_scale(projection_dim=self.features)(y)
         if self.stochastic_depth_drop_rate > 0.0:
             y = self.stochastic_depth(
-                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                stochastic_depth_drop_rate=self.stochastic_depth_drop_rate,
             )(y)
         else:
             lambda y: y
@@ -220,7 +223,6 @@ class InvertedResBlock(nn.Module):
     strides: Tuple[int, int]
     alpha: float
     filters: int
-    block_id: int
     conv: ModuleDef
     norm: ModuleDef
     act: Callable
@@ -231,8 +233,6 @@ class InvertedResBlock(nn.Module):
 
     @nn.compact
     def __call__(self, inputs):
-        prefix = "block_{}_".format(self.block_id)
-
         in_channels = inputs.shape[-1]
         pointwise_conv_filters = int(self.filters * self.alpha)
         pointwise_filters = _make_divisible(pointwise_conv_filters, 8)
@@ -244,9 +244,9 @@ class InvertedResBlock(nn.Module):
                 kernel_size=(1, 1),
                 strides=(1, 1),
                 padding="SAME",
-                name=prefix + "expand",
+                name="Expand_Conv",
             )(inputs)
-            x = self.norm(name=prefix + "expand_bn")(x)
+            x = self.norm()(x)
             x = self.act(x)
         else:
             x = inputs
@@ -259,9 +259,9 @@ class InvertedResBlock(nn.Module):
             strides=self.strides,
             padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
             feature_group_count=dw_filters,
-            name=prefix + "depthwise",
+            name="DepthWise_Conv",
         )(x)
-        x = self.norm(name=prefix + "depthwise_bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         # Project
@@ -270,9 +270,9 @@ class InvertedResBlock(nn.Module):
             kernel_size=(1, 1),
             strides=(1, 1),
             padding="SAME",
-            name=prefix + "project",
+            name="Project_Conv",
         )(x)
-        x = self.norm(name=prefix + "project_bn")(x)
+        x = self.norm()(x)
 
         if in_channels == pointwise_filters and self.strides == (1, 1):
             if (
@@ -280,7 +280,7 @@ class InvertedResBlock(nn.Module):
                 and self.stochastic_depth is not None
             ):
                 x = self.stochastic_depth(
-                    stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                    stochastic_depth_drop_rate=self.stochastic_depth_drop_rate,
                 )(x)
             x = x + inputs
 
@@ -295,7 +295,6 @@ class InvertedResBlockMobileNetV3(nn.Module):
     kernel_size: Tuple[int, int]
     strides: Tuple[int, int]
     se_ratio: float
-    block_id: int
     conv: ModuleDef
     norm: ModuleDef
     act: Callable = None
@@ -308,10 +307,8 @@ class InvertedResBlockMobileNetV3(nn.Module):
 
         se_bolock = partial(
             SeBlock,
-            conv=partial(nn.Conv, use_bias=True, dtype=self.dtype),
+            conv=partial(nn.Conv, dtype=self.dtype),
         )
-
-        prefix = "Block_{:02}_".format(self.block_id)
 
         if self.block_id != 1:
             # Expand
@@ -320,9 +317,9 @@ class InvertedResBlockMobileNetV3(nn.Module):
                 kernel_size=(1, 1),
                 strides=(1, 1),
                 padding="SAME",
-                name=prefix + "Expand_Conv",
+                name="Expand_Conv",
             )(x)
-            x = self.norm(name=prefix + "Expand_Bn")(x)
+            x = self.norm()(x)
             x = self.act(x)
 
         # Depthwise
@@ -333,9 +330,9 @@ class InvertedResBlockMobileNetV3(nn.Module):
             strides=self.strides,
             padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
             feature_group_count=dw_filters,
-            name=prefix + "DepthWise_Conv",
+            name="DepthWise_Conv",
         )(x)
-        x = self.norm(name=prefix + "DepthWise_Bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         if self.se_ratio:
@@ -350,9 +347,9 @@ class InvertedResBlockMobileNetV3(nn.Module):
             kernel_size=(1, 1),
             strides=(1, 1),
             padding="SAME",
-            name=prefix + "Project_Conv",
+            name="Project_Conv",
         )(x)
-        x = self.norm(name=prefix + "Project_Bn")(x)
+        x = self.norm()(x)
 
         if in_filters == self.filters and self.strides == (1, 1):
             x = x + inputs
@@ -369,7 +366,6 @@ class InvertedResBlockEfficientNet(nn.Module):
     strides: Tuple[int, int]
     se_ratio: float
     expand_ratio: int
-    block_id: int
     conv: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef = None
@@ -383,8 +379,6 @@ class InvertedResBlockEfficientNet(nn.Module):
         in_filters = x.shape[-1]
 
         se_bolock = partial(SeBlock, conv=self.conv, act1=jnn.swish, act2=jnn.sigmoid)
-
-        prefix = "block_{:02}_".format(self.block_id)
         features = int(in_filters * self.expansion)
 
         if self.expand_ratio != 1:
@@ -394,9 +388,9 @@ class InvertedResBlockEfficientNet(nn.Module):
                 kernel_size=(1, 1),
                 strides=(1, 1),
                 padding="SAME",
-                name=prefix + "expand_conv",
+                name="Expand_Conv",
             )(x)
-            x = self.norm(name=prefix + "expand_bn")(x)
+            x = self.norm()(x)
             x = self.act(x)
 
         # Depthwise
@@ -407,9 +401,9 @@ class InvertedResBlockEfficientNet(nn.Module):
             strides=self.strides,
             padding="SAME",
             feature_group_count=dw_filters,
-            name=prefix + "depthwise_conv",
+            name="DepthWise_Conv",
         )(x)
-        x = self.norm(name=prefix + "depthwise_bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         # Squeeze and Excitation
@@ -425,9 +419,9 @@ class InvertedResBlockEfficientNet(nn.Module):
             kernel_size=(1, 1),
             strides=(1, 1),
             padding="SAME",
-            name=prefix + "project_conv",
+            name="Project_Conv",
         )(x)
-        x = self.norm(name=prefix + "project_bn")(x)
+        x = self.norm()(x)
 
         if in_filters == self.out_filters and self.strides == (1, 1):
             if self.stochastic_depth_drop_rate > 0.0:
@@ -464,20 +458,18 @@ class DepthwiseSeparable(nn.Module):
             kernel_dilation=self.dilation,
             feature_group_count=in_features,
             padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
-            use_bias=False,
             name="DepthWise_Conv",
         )(x)
-        x = self.norm(name="Depthwise_Bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         x = self.conv(
             int(self.out_features * self.alpha),
             self.pw_kernel_size,
             padding="SAME",
-            use_bias=False,
             name="PointWise_Conv",
         )(x)
-        x = self.norm(name="PointWise_Bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         return x

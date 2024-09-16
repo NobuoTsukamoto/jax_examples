@@ -58,7 +58,7 @@ class MobileNetV1Backbone(nn.Module):
             use_bias=False,
             name="Stem_Conv",
         )(x)
-        x = self.norm(name="Stem_BN")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         x = depthwise_separable_conv(64, strides=(1, 1))(x)
@@ -88,10 +88,11 @@ class MobileNetV1(nn.Module):
     act: Callable = nn.relu6
     dropout_rate: Optional[float] = 0.2
     init_stochastic_depth_rate: Optional[float] = 0.0
+    use_bias: Optional[bool] = False
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, dtype=self.dtype)
+        conv = partial(nn.Conv, use_bias=self.use_bias, dtype=self.dtype)
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
@@ -114,6 +115,6 @@ class MobileNetV1(nn.Module):
         x = x.reshape(shape)
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
-        x = conv(self.num_classes, kernel_size=(1, 1))(x)
+        x = conv(self.num_classes, kernel_size=(1, 1), name="Head")(x)
         x = x.reshape((x.shape[0], -1))  # flatten
         return jnp.asarray(x, self.dtype)

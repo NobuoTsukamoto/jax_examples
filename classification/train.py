@@ -99,7 +99,6 @@ def train_step(
     dropout_rng=None,
     stochastic_depth_rng=None,
     with_batchnorm=True,
-    l2_weight_decay=0.0001,
     gradient_accumulation_steps=1,
     ema_decay=0.0,
 ):
@@ -128,15 +127,6 @@ def train_step(
             )
 
         loss = cross_entropy_loss(logits, batch["label"], num_classes, label_smoothing)
-        if l2_weight_decay > 0.0:
-            weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
-            weight_l2 = sum(
-                jnp.sum(x[1] ** 2)
-                for x in weight_penalty_params
-                if x[1].ndim > 1 and "DepthWise_Conv" not in x[0][0].key
-            )
-            weight_penalty = l2_weight_decay * 0.5 * weight_l2
-            loss = loss + weight_penalty
 
         if with_batchnorm:
             return loss, (new_model_state, logits)
@@ -416,7 +406,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             num_classes=num_classes,
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
-            l2_weight_decay=config.l2_weight_decay,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
             ema_decay=config.model_ema_decay,
         ),

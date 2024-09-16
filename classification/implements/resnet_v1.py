@@ -48,7 +48,7 @@ class ResNetBackbone(nn.Module):
             name="Stem_Conv",
         )(x)
 
-        x = self.norm(name="Stem_Bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
         x = nn.max_pool(x, window_shape=(3, 3), strides=(2, 2), padding="SAME")
 
@@ -81,10 +81,11 @@ class ResNet(nn.Module):
     num_classes: int
     init_stochastic_depth_rate: Optional[float] = 0.0
     dtype: Any = jnp.float32
+    use_bias: Optional[bool] = False
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=True, dtype=self.dtype)
+        conv = partial(nn.Conv, use_bias=self.use_bias, dtype=self.dtype)
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,

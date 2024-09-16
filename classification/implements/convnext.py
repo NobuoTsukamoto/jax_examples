@@ -52,7 +52,7 @@ class ConvNeXtBackbone(nn.Module):
             strides=(4, 4),
             name="Stem_Conv",
         )(x)
-        x = self.norm(name="Stem_Ln")(x)
+        x = self.norm()(x)
 
         num_stage = 0
         for i, block_size in enumerate(self.stage_sizes):
@@ -98,6 +98,7 @@ class ConvNeXt(nn.Module):
     init_stochastic_depth_rate: Optional[float] = 0.0
     kernel_size: Tuple[int, int] = (7, 7)
     dtype: Any = jnp.float32
+    use_bias: Optional[bool] = True
 
     @nn.compact
     def __call__(self, x, train: bool = True):
@@ -109,7 +110,12 @@ class ConvNeXt(nn.Module):
         ]
 
         kernel_initializer = jax.nn.initializers.truncated_normal(stddev=0.02)
-        conv = partial(nn.Conv, kernel_init=kernel_initializer, dtype=self.dtype)
+        conv = partial(
+            nn.Conv,
+            use_bias=self.use_bias,
+            kernel_init=kernel_initializer,
+            dtype=self.dtype,
+        )
         linear = partial(nn.Dense, kernel_init=kernel_initializer, dtype=self.dtype)
         norm = partial(
             nn.LayerNorm,

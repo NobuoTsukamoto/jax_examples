@@ -53,7 +53,7 @@ class MobileNetV3Backbone(nn.Module):
             strides=(2, 2),
             name="Stem_Conv",
         )(x)
-        x = self.norm(name="Stem_Bn")(x)
+        x = self.norm()(x)
         x = self.h_swish(x)
 
         for block_id, layer in self.layers.items():
@@ -72,7 +72,7 @@ class MobileNetV3Backbone(nn.Module):
         else:
             filters = _make_divisible(x.shape[-1] * 6, 8)
 
-        x = self.conv(filters, kernel_size=(1, 1), name="conv_1")(x)
+        x = self.conv(filters, kernel_size=(1, 1))(x)
         x = self.norm()(x)
         x = self.h_swish(x)
 
@@ -113,14 +113,12 @@ class MobileNetV3(nn.Module):
 
         x = jnp.mean(x, axis=(1, 2), keepdims=True)
 
-        x = conv(
-            self.last_block_filters, kernel_size=(1, 1), use_bias=True, name="conv_2"
-        )(x)
+        x = conv(self.last_block_filters, kernel_size=(1, 1), use_bias=True)(x)
         x = jnn.hard_swish(x)
 
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
-        x = conv(self.num_classes, kernel_size=(1, 1), use_bias=True, name="conv_3")(x)
+        x = conv(self.num_classes, kernel_size=(1, 1), use_bias=True, name="Head")(x)
         x = x.reshape((x.shape[0], -1))  # flatten
 
         return jnp.asarray(x, self.dtype)

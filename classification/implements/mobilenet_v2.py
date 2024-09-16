@@ -49,7 +49,7 @@ class MobileNetV2Backbone(nn.Module):
             padding="SAME",
             name="Stem_Conv",
         )(x)
-        x = self.norm(name="Stem_Bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         x = inverted_res_block(
@@ -57,62 +57,61 @@ class MobileNetV2Backbone(nn.Module):
             alpha=self.alpha,
             strides=(1, 1),
             expansion=1,
-            block_id=0,
             use_expand=False,
         )(x)
 
         x = inverted_res_block(
-            filters=24, alpha=self.alpha, strides=(2, 2), expansion=6, block_id=1
+            filters=24, alpha=self.alpha, strides=(2, 2), expansion=6
         )(x)
         x = inverted_res_block(
-            filters=24, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=2
-        )(x)
-
-        x = inverted_res_block(
-            filters=32, alpha=self.alpha, strides=(2, 2), expansion=6, block_id=3
-        )(x)
-        x = inverted_res_block(
-            filters=32, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=4
-        )(x)
-        x = inverted_res_block(
-            filters=32, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=5
+            filters=24, alpha=self.alpha, strides=(1, 1), expansion=6
         )(x)
 
         x = inverted_res_block(
-            filters=64, alpha=self.alpha, strides=(2, 2), expansion=6, block_id=6
+            filters=32, alpha=self.alpha, strides=(2, 2), expansion=6
         )(x)
         x = inverted_res_block(
-            filters=64, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=7
+            filters=32, alpha=self.alpha, strides=(1, 1), expansion=6
         )(x)
         x = inverted_res_block(
-            filters=64, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=8
-        )(x)
-        x = inverted_res_block(
-            filters=64, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=9
+            filters=32, alpha=self.alpha, strides=(1, 1), expansion=6
         )(x)
 
         x = inverted_res_block(
-            filters=96, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=10
+            filters=64, alpha=self.alpha, strides=(2, 2), expansion=6
         )(x)
         x = inverted_res_block(
-            filters=96, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=11
+            filters=64, alpha=self.alpha, strides=(1, 1), expansion=6
         )(x)
         x = inverted_res_block(
-            filters=96, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=12
-        )(x)
-
-        x = inverted_res_block(
-            filters=160, alpha=self.alpha, strides=(2, 2), expansion=6, block_id=13
+            filters=64, alpha=self.alpha, strides=(1, 1), expansion=6
         )(x)
         x = inverted_res_block(
-            filters=160, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=14
-        )(x)
-        x = inverted_res_block(
-            filters=160, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=15
+            filters=64, alpha=self.alpha, strides=(1, 1), expansion=6
         )(x)
 
         x = inverted_res_block(
-            filters=320, alpha=self.alpha, strides=(1, 1), expansion=6, block_id=16
+            filters=96, alpha=self.alpha, strides=(1, 1), expansion=6
+        )(x)
+        x = inverted_res_block(
+            filters=96, alpha=self.alpha, strides=(1, 1), expansion=6
+        )(x)
+        x = inverted_res_block(
+            filters=96, alpha=self.alpha, strides=(1, 1), expansion=6
+        )(x)
+
+        x = inverted_res_block(
+            filters=160, alpha=self.alpha, strides=(2, 2), expansion=6
+        )(x)
+        x = inverted_res_block(
+            filters=160, alpha=self.alpha, strides=(1, 1), expansion=6
+        )(x)
+        x = inverted_res_block(
+            filters=160, alpha=self.alpha, strides=(1, 1), expansion=6
+        )(x)
+
+        x = inverted_res_block(
+            filters=320, alpha=self.alpha, strides=(1, 1), expansion=6
         )(x)
 
         if self.alpha > 1.0:
@@ -120,8 +119,8 @@ class MobileNetV2Backbone(nn.Module):
         else:
             last_block_filters = 1280
 
-        x = self.conv(last_block_filters, kernel_size=(1, 1), name="conv_1")(x)
-        x = self.norm(name="conv_1_bn")(x)
+        x = self.conv(last_block_filters, kernel_size=(1, 1))(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         return x
@@ -136,10 +135,11 @@ class MobileNetV2(nn.Module):
     act: Callable = nn.relu
     dropout_rate: Optional[float] = 0.2
     init_stochastic_depth_rate: Optional[float] = 0.0
+    use_bias: Optional[bool] = False
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        conv = partial(nn.Conv, use_bias=self.use_bias, dtype=self.dtype)
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
@@ -159,6 +159,6 @@ class MobileNetV2(nn.Module):
 
         x = jnp.mean(x, axis=(1, 2))
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
-        x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
+        x = nn.Dense(self.num_classes, dtype=self.dtype, name="Head")(x)
         x = jnp.asarray(x, self.dtype)
         return x

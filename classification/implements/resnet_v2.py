@@ -51,7 +51,7 @@ class ResNetV2(nn.Module):
             kernel_size=(7, 7),
             strides=(2, 2),
             padding=[(3, 3), (3, 3)],
-            name="layer_1_conv",
+            name="Stem_Conv",
         )(x)
         x = nn.max_pool(x, (3, 3), strides=(2, 2), padding="SAME")
 
@@ -76,11 +76,11 @@ class ResNetV2(nn.Module):
                 name=layer_id + "_block" + str(layer_itmes["blocks"]),
             )(x)
 
-        x = norm(name="post_bn")(x)
+        x = norm()(x)
         x = self.act(x)
 
         x = jnp.mean(x, axis=(1, 2))
-        x = nn.Dense(self.num_classes, dtype=self.dtype, name="predictions")(x)
+        x = nn.Dense(self.num_classes, dtype=self.dtype, name="Head")(x)
         x = jnp.asarray(x, self.dtype)
         return x
 

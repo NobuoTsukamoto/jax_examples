@@ -10,6 +10,7 @@
 import ml_collections
 import optax
 from absl import logging
+from flax import traverse_util
 
 
 def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: int):
@@ -69,6 +70,21 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
     return schedule_fn
 
 
+def decay_mask_fn(params):
+    flat_params = traverse_util.flatten_dict(params)
+    flat_mask = {
+        path: (
+            path[-1] != "bias"
+            and "LayerNorm" not in path[-2]
+            and "BatchNorm" not in path[-2]
+            and "DepthWise" not in path[-2]
+            and "LayerScale" not in path[-2]
+        )
+        for path in flat_params
+    }
+    return traverse_util.unflatten_dict(flat_mask)
+
+
 def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
     """Create optimizer."""
 
@@ -80,7 +96,9 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
 
     if config.optimizer == "adamw":
         tx = optax.adamw(
-            learning_rate=learning_rate_fn, weight_decay=config.weight_decay
+            learning_rate=learning_rate_fn,
+            weight_decay=config.weight_decay,
+            mask=decay_mask_fn,
         )
 
     elif config.optimizer == "rmsprop":
@@ -96,6 +114,19 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
             learning_rate=learning_rate_fn,
             momentum=config.momentum,
             nesterov=True,
+        )
+
+    if config.optimizer != "adamww" and config.l2_weight_decay > 0.0:
+        logging.info(
+            "L2 weight decay rate. : %f",
+            config.l2_weight_decay,
+        )
+        tx = optax.chain(
+            optax.add_decayed_weights(
+                weight_decay=config.l2_weight_decay * 0.5,
+                mask=decay_mask_fn,
+            ),
+            tx,
         )
 
     if config.model_ema_decay > 0.0:
