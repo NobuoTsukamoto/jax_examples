@@ -17,16 +17,24 @@ def get_config():
     # As defined in the `models` module.
     config.model = "ResNet50"
 
+    # optimizer config
     config.optimizer = "adamw"
-    config.learning_rate = 0.004
     config.weight_decay = 0.05
     config.l2_weight_decay = 0.0
+
+    # LR scheduler config
+    config.learning_rate = 0.004
+    config.end_learning_rate = 1e-6
     config.warmup_epochs = 20.0
-    config.momentum = 0.9
-    config.batch_size = 2048
+
+    config.cache = False
+    config.half_precision = False
+    config.batch_size = 4096
+    config.shuffle_buffer_size = 16 * 1024
     config.label_smoothing = 0.1
     config.model_ema_decay = 0.9999
     config.model_ema = True
+    config.init_stochastic_depth_rate = 0.1
 
     config.num_epochs = 300
 
@@ -35,13 +43,37 @@ def get_config():
     config.randaug_num_layers = 2
     config.randaug_magnitude = 9
     config.randaug_cutout_const = 40.0
-    config.randaug_translate_const = 250
+    config.randaug_translate_const = 224 * 0.45
     config.randaug_magnitude_std = 0.5
     config.randaug_prob_to_apply = None
-    config.randaug_exclude_ops = None
+    config.randaug_exclude_ops = [
+        "AutoContrast",
+        "Equalize",
+        "Invert",
+        "Rotate",
+        "Posterize",
+        "Solarize",
+        "Color",
+        "Contrast",
+        "Brightness",
+        "Sharpness",
+        "ShearX",
+        "ShearY",
+        "TranslateX",
+        "TranslateY",
+        "SolarizeAdd",
+    ]
 
     # random erasing
-    config.random_erasing = False
+    config.random_erasing = True
+    config.random_erasing_probability = 0.25
+    config.random_erasing_min_area = 0.02
+    config.random_erasing_max_area = 1 / 3
+    config.random_erasing_min_aspect = 0.3
+    config.random_erasing_max_aspect = None
+    config.random_erasing_min_count = 1
+    config.random_erasing_max_count = 1
+    config.random_erasing_trials = 10
 
     # mixup and cutmix
     config.mixup_and_cutmix = True
@@ -50,7 +82,5 @@ def get_config():
     config.mixup_and_cutmix_prob = 1.0
     config.mixup_and_cutmix_switch_prob = 0.5
     config.mixup_and_cutmix_label_smoothing = 0.1
-
-    config.init_stochastic_depth_rate = 0.1
 
     return config

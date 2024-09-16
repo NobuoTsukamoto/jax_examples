@@ -91,7 +91,6 @@ def train_step(
     loss_fn,
     num_classes,
     ignore_label,
-    weight_decay=None,
     dropout_rng=None,
     gradient_accumulation_steps=1,
 ):
@@ -112,22 +111,12 @@ def train_step(
         if "aux_loss" in logits:
             aux_loss = 0.4 * loss_fn(logits["aux_loss"], batch["label"])
 
-        weight_penalty = 0
-        if weight_decay is not None:
-            weight_penalty_params = jax.tree_util.tree_leaves_with_path(params)
-            weight_l2 = sum(
-                jnp.sum(x[1] ** 2)
-                for x in weight_penalty_params
-                if x[1].ndim > 1 and "DepthWise_Conv" not in x[0][0].key
-            )
-            weight_penalty = weight_decay * 0.5 * weight_l2
-        loss = loss + aux_loss + weight_penalty
+        loss = loss + aux_loss
         return loss, (new_model_state, logits)
 
     step = state.step
     dynamic_scale = state.dynamic_scale
-    if learning_rate_fn is not None:
-        lr = learning_rate_fn(step // gradient_accumulation_steps)
+    lr = learning_rate_fn(step // gradient_accumulation_steps)
 
     if dynamic_scale:
         grad_fn = dynamic_scale.value_and_grad(
@@ -140,6 +129,7 @@ def train_step(
         aux, grads = grad_fn(state.params)
         # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
         grads = lax.pmean(grads, axis_name="batch")
+
     new_model_state, logits = aux[1]
     metrics = compute_metrics(
         logits["output"],
@@ -149,8 +139,7 @@ def train_step(
         ignore_label=ignore_label,
     )
 
-    if learning_rate_fn is not None:
-        metrics["learning_rate"] = lr
+    metrics["learning_rate"] = lr
 
     new_state = state.apply_gradients(
         grads=grads, batch_stats=new_model_state["batch_stats"]

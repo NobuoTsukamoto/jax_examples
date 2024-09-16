@@ -135,7 +135,7 @@ class FastSCNN(nn.Module):
         )
 
         # Learning to Down-sample
-        x = conv(32, kernel_size=(3, 3), strides=(2, 2), name="conv_init")(x)
+        x = conv(32, kernel_size=(3, 3), strides=(2, 2), name="Stem_Conv")(x)
         x = norm()(x)
         x = self.act(x)
         x = depthwise_separable_conv(48, strides=(2, 2))(x)
@@ -173,7 +173,7 @@ class FastSCNN(nn.Module):
         x = depthwise_separable_conv(128, strides=(1, 1))(x)
         x = depthwise_separable_conv(128, strides=(1, 1))(x)
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
-        x = conv(self.num_classes, kernel_size=(1, 1))(x)
+        x = conv(self.num_classes, kernel_size=(1, 1), name="Head")(x)
 
         x = jax.image.resize(
             x,
