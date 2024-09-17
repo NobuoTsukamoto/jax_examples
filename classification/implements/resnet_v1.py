@@ -11,8 +11,9 @@ from functools import partial
 from typing import Any, Callable, Sequence, Optional
 from stochastic_depth import get_stochastic_depth_rate, StochasticDepth
 
-from flax import linen as nn
+import jax
 import jax.numpy as jnp
+from flax import linen as nn
 
 ModuleDef = Any
 
@@ -85,7 +86,13 @@ class ResNet(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=self.use_bias, dtype=self.dtype)
+        kernel_initializer = jax.nn.initializers.truncated_normal(stddev=0.02)
+        conv = partial(
+            nn.Conv,
+            use_bias=self.use_bias,
+            kernel_init=kernel_initializer,
+            dtype=self.dtype,
+        )
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
