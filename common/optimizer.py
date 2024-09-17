@@ -116,7 +116,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
             nesterov=True,
         )
 
-    if config.optimizer != "adamww" and config.l2_weight_decay > 0.0:
+    if config.optimizer != "adamw" and config.l2_weight_decay > 0.0:
         logging.info(
             "L2 weight decay rate. : %f",
             config.l2_weight_decay,
@@ -129,7 +129,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
             tx,
         )
 
-    if config.model_ema_decay > 0.0:
+    if config.model_ema and config.model_ema_decay > 0.0:
         logging.info(
             "Decay rate for the exponential moving average. : %f",
             config.model_ema_decay,
