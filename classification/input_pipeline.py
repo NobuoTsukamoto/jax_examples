@@ -181,6 +181,7 @@ def create_split(
                 magnitude=config.randaug_magnitude,
                 cutout_const=config.randaug_cutout_const,
                 translate_const=config.randaug_translate_const,
+                magnitude_std=config.magnitude_std,
                 prob_to_apply=config.randaug_prob_to_apply,
                 exclude_ops=config.randaug_exclude_ops,
             )
