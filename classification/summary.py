@@ -11,7 +11,6 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 import models
-import tensorflow as tf
 from jax import random
 import flax.linen as nn
 
@@ -29,19 +28,6 @@ def create_model(*, model_cls, half_precision, num_classes, **kwargs):
     else:
         model_dtype = jnp.float32
     return model_cls(num_classes=num_classes, dtype=model_dtype, **kwargs)
-
-
-def get_input_dtype(half_precision):
-    platform = jax.local_devices()[0].platform
-    if half_precision:
-        if platform == "tpu":
-            input_dtype = tf.bfloat16
-        else:
-            input_dtype = tf.float16
-    else:
-        input_dtype = tf.float32
-
-    return input_dtype
 
 
 def summarize(config: ml_collections.ConfigDict):
