@@ -142,26 +142,27 @@ class FastSCNN(nn.Module):
         high_res = depthwise_separable_conv(64, strides=(2, 2))(x)
 
         # aux loss
-        aux_loss = conv(self.num_classes, kernel_size=(1, 1))(high_res)
-        aux_loss = jax.image.resize(
-            aux_loss,
-            shape=output_shape,
-            method="bilinear",
-        )
-        aux_loss = jnp.asarray(aux_loss, self.dtype)
+        if train:
+            aux_loss = conv(self.num_classes, kernel_size=(1, 1))(high_res)
+            aux_loss = jax.image.resize(
+                aux_loss,
+                shape=output_shape,
+                method="bilinear",
+            )
+            aux_loss = jnp.asarray(aux_loss, self.dtype)
 
         # Global Feature Extractor
-        x = bottlenck(filters=64, strides=(2, 2), expansion=6, block_id=0)(high_res)
-        x = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=1)(x)
-        x = bottlenck(filters=64, strides=(1, 1), expansion=6, block_id=2)(x)
+        x = bottlenck(filters=64, strides=(2, 2), expansion=6)(high_res)
+        x = bottlenck(filters=64, strides=(1, 1), expansion=6)(x)
+        x = bottlenck(filters=64, strides=(1, 1), expansion=6)(x)
 
-        x = bottlenck(filters=96, strides=(2, 2), expansion=6, block_id=3)(x)
-        x = bottlenck(filters=96, strides=(1, 1), expansion=6, block_id=4)(x)
-        x = bottlenck(filters=96, strides=(1, 1), expansion=6, block_id=5)(x)
+        x = bottlenck(filters=96, strides=(2, 2), expansion=6)(x)
+        x = bottlenck(filters=96, strides=(1, 1), expansion=6)(x)
+        x = bottlenck(filters=96, strides=(1, 1), expansion=6)(x)
 
-        x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=6)(x)
-        x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=7)(x)
-        x = bottlenck(filters=128, strides=(1, 1), expansion=6, block_id=8)(x)
+        x = bottlenck(filters=128, strides=(1, 1), expansion=6)(x)
+        x = bottlenck(filters=128, strides=(1, 1), expansion=6)(x)
+        x = bottlenck(filters=128, strides=(1, 1), expansion=6)(x)
 
         # Pyramid Pooing
         low_res = pyramid_pooling()(x)
@@ -181,4 +182,7 @@ class FastSCNN(nn.Module):
             method="bilinear",
         )
         x = jnp.asarray(x, self.dtype)
-        return {"output": x, "aux_loss": aux_loss}
+        if train:
+            return {"output": x, "aux_loss": aux_loss}
+        else:
+            return {"output": x}

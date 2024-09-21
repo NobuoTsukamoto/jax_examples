@@ -12,6 +12,10 @@ import jax
 import tensorflow as tf
 import tensorflow_models as tfm
 import tensorflow_datasets as tfds
+import ml_collections
+
+from typing import Optional, Any
+
 
 """ Input Pipline
 
@@ -55,13 +59,13 @@ def _prepare_image_and_label(datapoint, input_image_size):
 
 def parse_train_data(
     datapoint,
-    aug_scale_min,
-    aug_scale_max,
-    ignore_label=255,
-    crop_size=None,
-    input_image_size=IMAGE_SIZE,
-    output_image_size=None,
-    dtype=tf.float32,
+    aug_scale_min: float,
+    aug_scale_max: float,
+    ignore_label: Optional[int] = 255,
+    crop_size: Optional[tuple[int, int]] = None,
+    input_image_size: Optional[tuple[int, int]] = IMAGE_SIZE,
+    output_image_size: Optional[tuple[int, int]] = None,
+    dtype: Optional[Any] = tf.float32,
 ):
     image, label = _prepare_image_and_label(datapoint, input_image_size)
 
@@ -122,10 +126,10 @@ def parse_train_data(
 
 def parse_eval_data(
     datapoint,
-    ignore_label=255,
-    input_image_size=IMAGE_SIZE,
-    output_image_size=None,
-    dtype=tf.float32,
+    ignore_label: Optional[int] = 255,
+    input_image_size: Optional[tuple[int, int]] = IMAGE_SIZE,
+    output_image_size: Optional[tuple[int, int]] = None,
+    dtype: Optional[Any] = tf.float32,
 ):
     image, label = _prepare_image_and_label(datapoint, input_image_size)
 
@@ -161,31 +165,21 @@ def parse_eval_data(
 
 def create_split(
     dataset_builder,
-    batch_size,
-    train,
-    dtype=tf.float32,
-    input_image_size=IMAGE_SIZE,
-    output_image_size=None,
-    crop_image_size=None,
-    min_resize_value=0.5,
-    max_resize_value=2.0,
-    ignore_label=255,
-    cache=False,
+    batch_size: int,
+    train: bool,
+    config: ml_collections.ConfigDict,
+    dtype: Optional[Any] = tf.float32,
 ):
     """Creates a split from the ImageNet dataset using TensorFlow Datasets.
     Args:
         dataset_builder: TFDS dataset builder for ImageNet.
         batch_size: the batch size returned by the data pipeline.
-        train: Whether to load the train or evaluation split.
         dtype: data type of the image.
-        image_size: The target size of the images.
-        cache: Whether to cache the dataset.
-        ignore_label: ignore label.
+        train: Whether to load the train or evaluation split.
+        config: Configs.
     Returns:
         A `tf.data.Dataset`.
     """
-    shuffle_buffer_size = 16 * batch_size
-    prefetch = 10
 
     if train:
         train_examples = dataset_builder.info.splits["train"].num_examples
@@ -202,20 +196,20 @@ def create_split(
         if train:
             input_image, input_mask, _, _ = parse_train_data(
                 example,
-                min_resize_value,
-                max_resize_value,
-                ignore_label=ignore_label,
-                input_image_size=input_image_size,
-                output_image_size=output_image_size,
-                crop_size=crop_image_size,
+                config.min_resize_value,
+                config.max_resize_value,
+                ignore_label=config.ignore_label,
+                input_image_size=config.image_size,
+                output_image_size=config.output_image_size,
+                crop_size=config.crop_image_size,
                 dtype=dtype,
             )
         else:
             input_image, input_mask, _, _ = parse_eval_data(
                 example,
-                ignore_label=ignore_label,
-                input_image_size=input_image_size,
-                output_image_size=output_image_size,
+                ignore_label=config.ignore_label,
+                input_image_size=config.image_size,
+                output_image_size=config.output_image_size,
                 dtype=dtype,
             )
 
@@ -232,12 +226,12 @@ def create_split(
     options.threading.private_threadpool_size = 48
     ds = ds.with_options(options)
 
-    if cache:
+    if config.cache:
         ds = ds.cache()
 
     if train:
         ds = ds.repeat()
-        ds = ds.shuffle(shuffle_buffer_size, seed=42)
+        ds = ds.shuffle(config.shuffle_buffer_size, seed=42)
 
     ds = ds.map(decode_example, num_parallel_calls=tf.data.AUTOTUNE)
     ds = ds.batch(batch_size, drop_remainder=True)
@@ -245,6 +239,6 @@ def create_split(
     if not train:
         ds = ds.repeat()
 
-    ds = ds.prefetch(prefetch)
+    ds = ds.prefetch(config.prefetch)
 
     return ds

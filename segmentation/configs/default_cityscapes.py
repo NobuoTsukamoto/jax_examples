@@ -21,6 +21,8 @@ def get_config():
     config.model_input = (512, 1024)
 
     config.cache = False
+    config.shuffle_buffer_size = 8 * 128
+    config.prefetch = 10
     config.half_precision = False
 
     # fmt: off
@@ -38,6 +40,7 @@ def get_config():
     config.min_resize_value = 0.5
     config.max_resize_value = 2.0
     config.crop_image_size = (512, 1024)
+    config.output_image_size = (512, 1024)
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.

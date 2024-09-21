@@ -9,7 +9,7 @@
 
 import functools
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, Optional
 
 import jax
 import jax.numpy as jnp
@@ -35,7 +35,14 @@ from optimizer import create_learning_rate_fn, create_optimizer
 from utils import get_input_dtype
 
 
-def create_model(*, model_cls, half_precision, num_classes, output_size, **kwargs):
+def create_model(
+    *,
+    model_cls,
+    half_precision: bool,
+    num_classes: int,
+    output_size: Tuple[int, int],
+    **kwargs,
+):
     platform = jax.local_devices()[0].platform
     if half_precision:
         if platform == "tpu":
@@ -49,7 +56,7 @@ def create_model(*, model_cls, half_precision, num_classes, output_size, **kwarg
     )
 
 
-def initialized(key, image_size, model):
+def initialized(key, image_size: Tuple[int, int], model):
     input_shape = (1, image_size[0], image_size[1], 3)
 
     @jax.jit
@@ -60,7 +67,9 @@ def initialized(key, image_size, model):
     return variables["params"], variables["batch_stats"]
 
 
-def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
+def semantic_segmentation_metrics(
+    logits, labels: int, num_classes: int, ignore_label: int
+):
     return eval_semantic_segmentation(
         jnp.argmax(logits, axis=-1),
         jnp.squeeze(labels, axis=-1),
@@ -69,7 +78,7 @@ def semantic_segmentation_metrics(logits, labels, num_classes, ignore_label):
     )
 
 
-def compute_metrics(logits, labels, loss_fn, num_classes, ignore_label):
+def compute_metrics(logits, labels, loss_fn, num_classes: int, ignore_label: int):
     loss = loss_fn(logits, labels)
     segmentation_metrics = semantic_segmentation_metrics(
         logits, labels, num_classes, ignore_label
@@ -89,10 +98,10 @@ def train_step(
     batch,
     learning_rate_fn,
     loss_fn,
-    num_classes,
-    ignore_label,
+    num_classes: int,
+    ignore_label: int,
     dropout_rng=None,
-    gradient_accumulation_steps=1,
+    gradient_accumulation_steps: Optional[int] = 1,
 ):
     """Perform a single training step."""
 
@@ -188,29 +197,17 @@ def prepare_tf_data(xs):
 
 def create_input_iter(
     dataset_builder,
-    batch_size,
-    input_image_size,
-    crop_image_size,
-    min_resize_value,
-    max_resize_value,
-    output_image_size,
+    batch_size: int,
+    train: bool,
+    config: ml_collections,
     dtype,
-    train,
-    cache,
-    ignore_label,
 ):
     ds = input_pipeline.create_split(
         dataset_builder,
-        batch_size,
-        input_image_size=input_image_size,
-        crop_image_size=crop_image_size,
-        min_resize_value=min_resize_value,
-        max_resize_value=max_resize_value,
-        output_image_size=output_image_size,
-        dtype=dtype,
+        batch_size=batch_size,
         train=train,
-        cache=cache,
-        ignore_label=ignore_label,
+        config=config,
+        dtype=dtype,
     )
     it = map(prepare_tf_data, ds)
     it = jax_utils.prefetch_to_device(it, 2)
@@ -259,7 +256,7 @@ def create_train_state(
     rngs: Dict[str, jnp.ndarray],
     config: ml_collections.ConfigDict,
     model,
-    image_size,
+    image_size: Tuple[int, int],
     learning_rate_fn,
 ):
     """Create initial training state."""
@@ -312,30 +309,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
     dataset_builder = tfds.builder(config.dataset, data_dir=config.dataset_dir)
     dataset_builder.download_and_prepare()
     train_iter = create_input_iter(
-        dataset_builder,
-        local_batch_size,
-        config.image_size,
-        config.crop_image_size,
-        config.min_resize_value,
-        config.max_resize_value,
-        config.output_image_size,
-        input_dtype,
-        train=True,
-        cache=config.cache,
-        ignore_label=config.ignore_label,
+        dataset_builder, local_batch_size, train=True, config=config, dtype=input_dtype
     )
     eval_iter = create_input_iter(
-        dataset_builder,
-        local_batch_size,
-        config.image_size,
-        config.crop_image_size,
-        config.min_resize_value,
-        config.max_resize_value,
-        config.output_image_size,
-        input_dtype,
-        train=False,
-        cache=config.cache,
-        ignore_label=config.ignore_label,
+        dataset_builder, local_batch_size, train=False, config=config, dtype=input_dtype
     )
     num_classes = config.num_classes
     output_size = config.output_image_size
@@ -390,7 +367,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
             loss_fn=loss_fn,
             num_classes=num_classes,
             ignore_label=config.ignore_label,
-            weight_decay=config.weight_decay,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
         ),
         axis_name="batch",
