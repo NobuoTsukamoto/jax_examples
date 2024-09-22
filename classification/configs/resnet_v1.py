@@ -42,27 +42,11 @@ def get_config():
     config.aug_type = "randaug"
     config.randaug_num_layers = 2
     config.randaug_magnitude = 9
-    config.randaug_cutout_const = 40.0
-    config.randaug_translate_const = 224 * 0.45
-    config.randaug_magnitude_std = 0.5
+    config.randaug_cutout_const = 40
+    config.randaug_translate_const = 100
+    config.randaug_magnitude_std = 0.0
     config.randaug_prob_to_apply = None
-    config.randaug_exclude_ops = [
-        "AutoContrast",
-        "Equalize",
-        "Invert",
-        "Rotate",
-        "Posterize",
-        "Solarize",
-        "Color",
-        "Contrast",
-        "Brightness",
-        "Sharpness",
-        "ShearX",
-        "ShearY",
-        "TranslateX",
-        "TranslateY",
-        "SolarizeAdd",
-    ]
+    config.randaug_exclude_ops = ["Cutout"]
 
     # random erasing
     config.random_erasing = True

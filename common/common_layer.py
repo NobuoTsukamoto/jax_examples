@@ -297,6 +297,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
     se_ratio: float
     conv: ModuleDef
     norm: ModuleDef
+    block_id: int
     act: Callable = None
     dtype: Any = jnp.float32
 
