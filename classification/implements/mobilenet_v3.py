@@ -34,8 +34,8 @@ class MobileNetV3Backbone(nn.Module):
     alpha: float
     layers: Dict
     dtype: Any = jnp.float32
-    relu: Callable = nn.relu
-    h_swish: Callable = jnn.hard_swish
+    relu: Callable = nn.relu6
+    h_swish: Callable = nn.hard_swish
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
 
@@ -96,8 +96,8 @@ class MobileNetV3(nn.Module):
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
-            momentum=0.999,
-            epsilon=1e-3,
+            momentum=0.997,
+            epsilon=0.001,
             dtype=self.dtype,
         )
         backbone = partial(
