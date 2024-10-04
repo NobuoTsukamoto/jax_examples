@@ -38,13 +38,13 @@ def get_config():
 
     config.cache = True
     config.half_precision = True
-    config.batch_size = 1024
-    config.model_ema_decay = 0.9999
-    config.model_ema = True
 
     config.batch_size = 4096
     config.label_smoothing = 0.1
     config.l2_weight_decay = 0.00001
+
+    config.model_ema_decay = 0.9999
+    config.model_ema = True
 
     config.num_epochs = 1000
 
