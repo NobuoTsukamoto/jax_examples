@@ -145,7 +145,7 @@ class ConvNeXt(nn.Module):
 
         x = jnp.mean(x, axis=(1, 2))
         x = norm()(x)
-        x = nn.Dense(self.num_classes, dtype=self.dtype)(x)
+        x = nn.Dense(self.num_classes, name="Head" dtype=self.dtype)(x)
 
         x = jnp.asarray(x, self.dtype)
         return x
