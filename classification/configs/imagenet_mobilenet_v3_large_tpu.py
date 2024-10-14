@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
+    Copyright (c) 2024 Nobuo Tsukamoto
     This software is released under the MIT License.
     See the LICENSE file in the project root for more information.
 """
@@ -15,7 +15,7 @@ def get_config():
     config = default_lib.get_config()
 
     # As defined in the `models` module.
-    config.model = "MobileNetV3_Small"
+    config.model = "MobileNetV3_Large"
 
     # dataset
     config.dataset = "imagenet2012:5.*.*"
@@ -39,7 +39,7 @@ def get_config():
     config.cache = True
     config.half_precision = True
 
-    config.batch_size = 4096
+    config.batch_size = 1024
     config.label_smoothing = 0.1
     config.l2_weight_decay = 0.00001
 
