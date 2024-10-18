@@ -21,31 +21,29 @@ def get_config():
     config.dataset = "imagenet2012:5.*.*"
 
     # optimizer config
-    config.optimizer = "rmsprop"
-    config.rmsprop_rho = 0.9
-    config.rmsprop_momentum = 0.9
-    config.rmsprop_epsilon = 0.002
-    config.rmsprop_decay = 0.9
+    config.optimizer = "adamw"
+    config.weight_decay = 0.1
+    config.l2_weight_decay = 0.0
+
+    # Auto augment
+    config.aug_type = "autoaug"
+    config.autoaug_augmentation_name = "v0"
+    config.autoaug_cutout_const = 100
+    config.autoaug_translate_const = 250
 
     # LR scheduler config
-    config.optimizer_schedule = "warmup_exponential_decay"
-    config.initial_learning_rate = 0.0
-    config.learning_rate = 0.16  # 0.02 * (batch_size / 128)
-    config.warmup_epochs = 5
-    config.exponential_decay_rate = 0.99
-    config.transition_steps = 3756  # 3.0 * steps_per_epoch (1252)
-    config.lr_drop_staircase = True
+    config.optimizer_schedule = "cosine"
+    config.learning_rate = 0.004
 
     config.cache = True
     config.half_precision = True
 
-    config.batch_size = 1024
+    config.batch_size = 1536  # 192 * 8
     config.label_smoothing = 0.1
-    config.l2_weight_decay = 0.00001
 
     config.model_ema_decay = 0.9999
     config.model_ema = True
 
-    config.num_epochs = 1000
+    config.num_epochs = 700
 
     return config

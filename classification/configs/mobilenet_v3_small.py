@@ -18,7 +18,6 @@ def get_config():
     config.model = "MobileNetV3_Small"
 
     config.optimizer = "rmsprop"
-    config.rmsprop_rho = 0.9
     config.rmsprop_momentum = 0.9
     config.rmsprop_epsilon = 0.002
     config.rmsprop_decay = 0.9

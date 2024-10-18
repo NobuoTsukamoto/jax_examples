@@ -22,7 +22,6 @@ def get_config():
 
     # optimizer config
     config.optimizer = "rmsprop"
-    config.rmsprop_rho = 0.9
     config.rmsprop_momentum = 0.9
     config.rmsprop_epsilon = 0.002
     config.rmsprop_decay = 0.9
@@ -39,7 +38,7 @@ def get_config():
     config.cache = True
     config.half_precision = True
 
-    config.batch_size = 1024
+    config.batch_size = 1536  # 192 * 8
     config.label_smoothing = 0.1
     config.l2_weight_decay = 0.00001
 
