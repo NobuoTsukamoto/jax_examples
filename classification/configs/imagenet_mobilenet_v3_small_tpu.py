@@ -29,7 +29,7 @@ def get_config():
     # LR scheduler config
     config.optimizer_schedule = "warmup_exponential_decay"
     config.initial_learning_rate = 0.0
-    config.learning_rate = 0.16  # 0.02 * (batch_size / 128)
+    config.learning_rate = 0.16  # 0.02 * (batch_size / 192)
     config.warmup_epochs = 5
     config.exponential_decay_rate = 0.99
     config.transition_steps = 3756  # 3.0 * steps_per_epoch (1252)
