@@ -42,7 +42,7 @@ def get_config():
     config.log_every_steps = 100
 
     config.cache = False
-    config.shuffle_buffer_size = 8 * 128
+    config.shuffle_buffer_size = 16 * 4096
     config.prefetch = 10
 
     config.half_precision = False
