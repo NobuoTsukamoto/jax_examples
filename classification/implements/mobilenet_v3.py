@@ -10,6 +10,7 @@
 from functools import partial
 from typing import Any, Callable, Dict, Optional
 
+import jax
 import jax.numpy as jnp
 import jax.nn as jnn
 from flax import linen as nn
@@ -92,7 +93,12 @@ class MobileNetV3(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        kernel_initializer = jax.nn.initializers.variance_scaling(
+            scale=1.0, mode="fan_in", distribution="truncated_normal"
+        )
+        conv = partial(
+            nn.Conv, use_bias=False, kernel_init=kernel_initializer, dtype=self.dtype
+        )
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
