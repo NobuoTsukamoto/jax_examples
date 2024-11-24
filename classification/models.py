@@ -15,6 +15,7 @@ from implements.resnet_v2 import ResNetV2, ResNet50V2_layer
 from implements.resnet_v1 import ResNet
 from implements.convnext import ConvNeXt
 from implements.vit import ViT
+from implements.efficientnet import EfficientNet
 
 from common_layer import (
     ResNetBlock,
@@ -95,4 +96,22 @@ ViT_4S = partial(
     num_blocks=12,
     head=6,
     hidden_dim=384,
+)
+
+# EfficientNet B0
+EfficientNet_B0 = partial(
+    EfficientNet,
+    width_coefficient=1.0,
+    depth_coefficient=1.0,
+    default_size=224,
+    dropout_rate=0.2,
+)
+
+# EfficientNet B1
+EfficientNet_B1 = partial(
+    EfficientNet,
+    width_coefficient=1.0,
+    depth_coefficient=1.1,
+    default_size=240,
+    dropout_rate=0.2,
 )

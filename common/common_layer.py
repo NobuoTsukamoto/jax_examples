@@ -77,7 +77,6 @@ class ResidualBlockV2(nn.Module):
     act: Callable
     strides: Tuple[int, int] = None
     is_conv_shortcut: bool = False
-    dtype: Any = jnp.float32
 
     @nn.compact
     def __call__(self, inputs):
@@ -228,7 +227,6 @@ class InvertedResBlock(nn.Module):
     act: Callable
     use_expand: Optional[bool] = True
     stochastic_depth: Optional[ModuleDef] = None
-    dtype: Any = jnp.float32
     stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
@@ -338,7 +336,8 @@ class InvertedResBlockMobileNetV3(nn.Module):
 
         if self.se_ratio:
             x = se_bolock(
-                filters=_make_divisible(in_filters * self.expansion),
+                in_filters=_make_divisible(in_filters * self.expansion),
+                out_filters=dw_filters,
                 se_ratio=self.se_ratio,
             )(x)
 
@@ -366,23 +365,23 @@ class InvertedResBlockEfficientNet(nn.Module):
     kernel_size: Tuple[int, int]
     strides: Tuple[int, int]
     se_ratio: float
-    expand_ratio: int
     conv: ModuleDef
     norm: ModuleDef
     stochastic_depth: ModuleDef = None
     act: Callable = None
     stochastic_depth_drop_rate: Optional[float] = 0.0
-    dtype: Any = jnp.float32
 
     @nn.compact
     def __call__(self, x):
         inputs = x
         in_filters = x.shape[-1]
 
-        se_bolock = partial(SeBlock, conv=self.conv, act1=jnn.swish, act2=jnn.sigmoid)
+        se_bolock = partial(
+            SeBlock, conv=self.conv, act1=self.act, act2=jnn.swish, divisor=2
+        )
         features = int(in_filters * self.expansion)
 
-        if self.expand_ratio != 1:
+        if self.expansion != 1:
             # Expand
             x = self.conv(
                 features=features,
@@ -400,7 +399,7 @@ class InvertedResBlockEfficientNet(nn.Module):
             features=dw_filters,
             kernel_size=self.kernel_size,
             strides=self.strides,
-            padding="SAME",
+            padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
             feature_group_count=dw_filters,
             name="DepthWise_Conv",
         )(x)
@@ -409,8 +408,23 @@ class InvertedResBlockEfficientNet(nn.Module):
 
         # Squeeze and Excitation
         if self.se_ratio:
+
+            # y = jnp.mean(x, axis=(1, 2), keepdims=True)
+
+            # y = self.conv(
+            #     se_filters, kernel_size=(1, 1), padding="same", use_bias=True
+            # )(y)
+            # y = self.act(y)
+
+            # y = self.conv(
+            #     dw_filters, kernel_size=(1, 1), padding="same", use_bias=True
+            # )(y)
+            # y = jnn.swish(y)
+
+            # y = jnp.multiply(x, y)
             x = se_bolock(
-                filters=features,
+                in_filters=in_filters,
+                out_filters=dw_filters,
                 se_ratio=self.se_ratio,
             )(x)
 
@@ -426,6 +440,7 @@ class InvertedResBlockEfficientNet(nn.Module):
 
         if in_filters == self.out_filters and self.strides == (1, 1):
             if self.stochastic_depth_drop_rate > 0.0:
+                print("stochatic depth")
                 x = self.stochastic_depth(
                     stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
                 )(x)
@@ -479,25 +494,31 @@ class DepthwiseSeparable(nn.Module):
 class SeBlock(nn.Module):
     """Squeeze-and-Excitation Networks"""
 
-    filters: int
+    in_filters: int
+    out_filters: int
     se_ratio: int
     conv: ModuleDef
     act1: Callable = nn.relu
     act2: Callable = nn.hard_sigmoid
+    use_bias: bool = True
+    divisor: int = 8
 
     @nn.compact
     def __call__(self, x):
         inputs = x
-        filters = _make_divisible(self.filters * self.se_ratio)
-        in_filters = x.shape[-1]
+        se_filters = _make_divisible(
+            self.in_filters * self.se_ratio, divisor=self.divisor
+        )
 
         x = jnp.mean(x, axis=(1, 2), keepdims=True)
-        x = x.reshape(-1, 1, 1, in_filters)
-
-        x = self.conv(filters, kernel_size=(1, 1), padding="same")(x)
+        x = self.conv(
+            se_filters, kernel_size=(1, 1), padding="same", use_bias=self.use_bias
+        )(x)
         x = self.act1(x)
 
-        x = self.conv(self.filters, kernel_size=(1, 1), padding="same")(x)
+        x = self.conv(
+            self.out_filters, kernel_size=(1, 1), padding="same", use_bias=self.use_bias
+        )(x)
         x = self.act2(x)
 
         return jnp.multiply(inputs, x)
