@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/jax:24.04-py3
+FROM nvcr.io/nvidia/jax:24.10-py3
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Tokyo
