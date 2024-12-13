@@ -77,6 +77,7 @@ def decay_mask_fn(params):
             path[-1] != "bias"
             and "LayerNorm" not in path[-2]
             and "BatchNorm" not in path[-2]
+            and "DepthWise" not in path[-2]
             and "LayerScale" not in path[-2]
         )
         for path in flat_params
