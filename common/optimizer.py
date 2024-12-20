@@ -107,6 +107,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
             decay=config.rmsprop_decay,
             momentum=config.momentum,
             eps=config.rmsprop_epsilon,
+            initial_scale=config.rmsprop_initial_scale,
         )
 
     elif config.optimizer == "sgd":

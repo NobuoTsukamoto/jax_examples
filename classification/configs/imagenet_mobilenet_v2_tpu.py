@@ -25,6 +25,7 @@ def get_config():
     config.rmsprop_decay = 0.9
     config.rmsprop_epsilon = 0.002
     config.momentum = 0.9
+    config.rmsprop_initial_scale = 1.0
 
     # LR scheduler config
     config.optimizer_schedule = "warmup_exponential_decay"
