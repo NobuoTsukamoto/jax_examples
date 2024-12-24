@@ -50,7 +50,7 @@ I will be adding mainly computer vision tasks. I will start with code for model 
 | DABNet: Depth-wise Asymmetric Bottleneck for Real-time Semantic Segmentation | https://arxiv.org/abs/1907.11357 |
 | LEDNet: A Lightweight Encoder-Decoder Network for Real-time Semantic Segmentation | https://arxiv.org/abs/1905.02423 |
 
-## Loss function
+### Segmentation Loss function
 | Loss | Paper's | URL | Task |
 |:--|:-- |:--|:--|
 | Cross Entropy Loss with class weight | - | - | Semantic Segmentation |
