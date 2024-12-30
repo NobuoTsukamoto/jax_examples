@@ -408,20 +408,6 @@ class InvertedResBlockEfficientNet(nn.Module):
 
         # Squeeze and Excitation
         if self.se_ratio:
-
-            # y = jnp.mean(x, axis=(1, 2), keepdims=True)
-
-            # y = self.conv(
-            #     se_filters, kernel_size=(1, 1), padding="same", use_bias=True
-            # )(y)
-            # y = self.act(y)
-
-            # y = self.conv(
-            #     dw_filters, kernel_size=(1, 1), padding="same", use_bias=True
-            # )(y)
-            # y = jnn.swish(y)
-
-            # y = jnp.multiply(x, y)
             x = se_bolock(
                 in_filters=in_filters,
                 out_filters=dw_filters,
@@ -440,7 +426,6 @@ class InvertedResBlockEfficientNet(nn.Module):
 
         if in_filters == self.out_filters and self.strides == (1, 1):
             if self.stochastic_depth_drop_rate > 0.0:
-                print("stochatic depth")
                 x = self.stochastic_depth(
                     stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
                 )(x)
