@@ -26,6 +26,7 @@ ModuleDef = Any
         https://arxiv.org/abs/1905.02244
 
         https://github.com/keras-team/keras-applications/blob/06fbeb0f16e1304f239b2296578d1c50b15a983a/keras_applications/mobilenet_v3.py
+        https://github.com/tensorflow/models/blob/v2.18.0/official/vision/modeling/backbones/mobilenet.py
 """
 
 
@@ -35,7 +36,7 @@ class MobileNetV3Backbone(nn.Module):
     alpha: float
     layers: Dict
     dtype: Any = jnp.float32
-    relu: Callable = nn.relu6
+    relu: Callable = nn.relu
     h_swish: Callable = nn.hard_swish
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm

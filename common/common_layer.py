@@ -306,7 +306,9 @@ class InvertedResBlockMobileNetV3(nn.Module):
 
         se_bolock = partial(
             SeBlock,
-            conv=partial(nn.Conv, dtype=self.dtype),
+            conv=partial(nn.Conv, use_bias=True, dtype=self.dtype),
+            act1=nn.relu,
+            act2=nn.hard_sigmoid
         )
 
         if self.block_id != 1:
