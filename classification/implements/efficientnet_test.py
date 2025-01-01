@@ -22,7 +22,6 @@ EfficientNet_B0 = partial(
     EfficientNet,
     width_coefficient=1.0,
     depth_coefficient=1.0,
-    default_size=224,
     dropout_rate=0.2,
     init_stochastic_depth_rate=0.1,
 )
@@ -32,7 +31,6 @@ EfficientNet_B1 = partial(
     EfficientNet,
     width_coefficient=1.0,
     depth_coefficient=1.1,
-    default_size=240,
     dropout_rate=0.2,
     init_stochastic_depth_rate=0.1,
 )
@@ -44,17 +42,17 @@ class EfficientNetTest(parameterized.TestCase):
     """Test cases for ConvNeXt model definition."""
 
     def test_efficientnet_b0_model(self):
-        """Tests EfficientNet T model definition and output (variables)."""
+        """Tests EfficientNet B0 model definition and output (variables)."""
         rng = jax.random.PRNGKey(0)
         model_def = EfficientNet_B0(num_classes=1000, dtype=jnp.float32)
         variables = model_def.init(rng, jnp.ones((1, 224, 224, 3), jnp.float32))
         self.assertLen(variables, 2)
 
     def test_efficientnet_b1_model(self):
-        """Tests ConvNeXt T model definition and output (variables)."""
+        """Tests EfficientNet B1 model definition and output (variables)."""
         rng = jax.random.PRNGKey(0)
         model_def = EfficientNet_B1(num_classes=1000, dtype=jnp.float32)
-        variables = model_def.init(rng, jnp.ones((1, 224, 224, 3), jnp.float32))
+        variables = model_def.init(rng, jnp.ones((1, 240, 240, 3), jnp.float32))
         self.assertLen(variables, 2)
 
     def test_efficientnet_b0_summary(self):

@@ -103,7 +103,6 @@ EfficientNet_B0 = partial(
     EfficientNet,
     width_coefficient=1.0,
     depth_coefficient=1.0,
-    default_size=224,
     dropout_rate=0.2,
 )
 
@@ -112,6 +111,5 @@ EfficientNet_B1 = partial(
     EfficientNet,
     width_coefficient=1.0,
     depth_coefficient=1.1,
-    default_size=240,
     dropout_rate=0.2,
 )

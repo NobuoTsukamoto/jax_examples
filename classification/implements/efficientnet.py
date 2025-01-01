@@ -142,7 +142,6 @@ class EfficientNet(nn.Module):
     init_stochastic_depth_rate: Optional[float] = 0.0
     width_coefficient: Optional[float] = 1.0
     depth_coefficient: Optional[float] = 1.0
-    default_size: Optional[int] = 224
     dropout_rate: Optional[float] = 0.2
     dtype: Any = jnp.float32
     use_bias: Optional[bool] = False
