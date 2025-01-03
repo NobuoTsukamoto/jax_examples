@@ -27,6 +27,8 @@ ModuleDef = Any
         EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks
         https://arxiv.org/abs/1905.11946
         https://github.com/keras-team/keras/blob/v3.5.0/keras/src/applications/efficientnet.py
+        https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet
+        https://github.com/tensorflow/models/tree/master/official/vision
 """
 
 # fmt: off
@@ -112,7 +114,7 @@ class EfficientNetBackbone(nn.Module):
                 else:
                     strides = layer["strides"]
 
-                drop_rate = self.init_stochastic_depth_rate * num_stage / blocks
+                drop_rate = self.init_stochastic_depth_rate * float(num_stage) / blocks
 
                 x = inverted_res_block(
                     expansion=layer["exp"],

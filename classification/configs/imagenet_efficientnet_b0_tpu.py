@@ -33,7 +33,7 @@ def get_config():
     config.learning_rate = 0.128  # 0.016 * batch_size(2048) / 256
     config.warmup_epochs = 5
     config.exponential_decay_rate = 0.97
-    config.transition_steps = 751  # 2.4 * steps_per_epoch (313)
+    config.transition_steps = 1500  # 2.4 * steps_per_epoch (625)
     config.lr_drop_staircase = True
 
     # Auto augment
