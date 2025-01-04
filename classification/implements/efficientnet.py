@@ -132,7 +132,7 @@ class EfficientNetBackbone(nn.Module):
         x = self.act(x)
 
         # Global average pooling
-        x = jnp.mean(x, axis=(1, 2), keepdims=True)
+        x = jnp.mean(x, axis=(1, 2))
 
         return x
 
@@ -194,7 +194,7 @@ class EfficientNet(nn.Module):
             self.num_classes,
             name="Head",
             kernel_init=dense_initializer,
-            dtype=self.dtype
+            dtype=self.dtype,
         )(x)
 
         return jnp.asarray(x, self.dtype)
