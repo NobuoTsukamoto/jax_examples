@@ -51,6 +51,7 @@ def get_config():
 
     config.model_ema_decay = 0.9999
     config.model_ema = True
+    config.init_stochastic_depth_rate = 0.2
 
     config.num_epochs = 350
 

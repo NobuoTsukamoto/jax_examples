@@ -27,10 +27,10 @@ def get_config():
     # LR scheduler config
     config.optimizer_schedule = "warmup_exponential_decay"
     config.initial_learning_rate = 0.0
-    config.learning_rate = 0.002  # 0.016 * batch_size(32) / 256
+    config.learning_rate = 0.001  # 0.016 * batch_size(16) / 256
     config.warmup_epochs = 5
     config.exponential_decay_rate = 0.97
-    config.transition_steps = 710  # 2.4 * steps_per_epoch (296)
+    config.transition_steps = 1291  # 2.4 * steps_per_epoch (538)
     config.lr_drop_staircase = True
 
     # Auto augment
@@ -41,13 +41,14 @@ def get_config():
 
     config.cache = False
     config.half_precision = False
-    config.batch_size = 32
+    config.batch_size = 16
 
     config.label_smoothing = 0.1
     config.l2_weight_decay = 1e-5
 
     config.model_ema_decay = 0.9999
     config.model_ema = True
+    config.init_stochastic_depth_rate = 0.2
 
     config.num_epochs = 350
 
