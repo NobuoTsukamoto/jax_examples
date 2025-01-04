@@ -27,6 +27,7 @@ from flax.training import dynamic_scale as dynamic_scale_lib
 from flax.training import train_state
 from jax import lax
 
+from train_state import TrainStateWithBatchNorm, TrainStateWithoutBatchNorm
 from optimizer import create_learning_rate_fn, create_optimizer
 from utils import get_input_dtype
 
@@ -231,33 +232,6 @@ def create_input_iter(dataset_builder, batch_size, dtype, train, config):
     it = map(prepare_tf_data, ds)
     it = jax_utils.prefetch_to_device(it, 2)
     return it
-
-
-class TrainStateWithBatchNorm(train_state.TrainState):
-    batch_stats: Any
-    dynamic_scale: dynamic_scale_lib.DynamicScale
-    ema_decay: float = 0.0
-    ema_params: Any = None
-
-    def apply_ema(self):
-        return jax.tree_util.tree_map(
-            lambda ema, param: (ema * self.ema_decay + param * (1.0 - self.ema_decay)),
-            self.ema_params,
-            self.params,
-        )
-
-
-class TrainStateWithoutBatchNorm(train_state.TrainState):
-    dynamic_scale: dynamic_scale_lib.DynamicScale
-    ema_decay: float = 0.0
-    ema_params: Any = None
-
-    def apply_ema(self):
-        return jax.tree_util.tree_map(
-            lambda ema, param: (ema * self.ema_decay + param * (1.0 - self.ema_decay)),
-            self.ema_params,
-            self.params,
-        )
 
 
 def restore_checkpoint(state, workdir):
