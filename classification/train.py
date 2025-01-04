@@ -379,7 +379,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         steps_per_eval = config.steps_per_eval
 
     logging.info(
-        "Steps per epech : %d, Step per eval : %d.", steps_per_epoch, steps_per_eval
+        "Steps per epech: %d, Step per eval: %d.", steps_per_epoch, steps_per_eval
     )
 
     steps_per_checkpoint = steps_per_epoch
