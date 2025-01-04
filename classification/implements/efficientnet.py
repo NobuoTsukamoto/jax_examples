@@ -92,7 +92,7 @@ class EfficientNetBackbone(nn.Module):
         x = self.conv(
             stem_filters, kernel_size=(3, 3), strides=(2, 2), name="Stem_Conv"
         )(x)
-        x = self.norm(name="Stem_Bn")(x)
+        x = self.norm()(x)
         x = self.act(x)
 
         num_stage = 0
@@ -150,13 +150,24 @@ class EfficientNet(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
+        kernel_initializer = nn.initializers.variance_scaling(
+            scale=2.0, mode="fan_out", distribution="truncated_normal"
+        )
+        dense_initializer = nn.initializers.variance_scaling(
+            scale=1.0 / 3.0, mode="fan_out", distribution="truncated_normal"
+        )
 
-        conv = partial(nn.Conv, use_bias=self.use_bias, dtype=self.dtype)
+        conv = partial(
+            nn.Conv,
+            use_bias=self.use_bias,
+            kernel_init=kernel_initializer,
+            dtype=self.dtype,
+        )
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
-            momentum=0.997,
-            epsilon=0.001,
+            momentum=0.99,
+            epsilon=1e-3,
             dtype=self.dtype,
         )
         stochastic_depth = partial(StochasticDepth, deterministic=not train)
@@ -179,6 +190,11 @@ class EfficientNet(nn.Module):
         if self.dropout_rate > 0.0:
             x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
-        x = nn.Dense(self.num_classes, name="Head", dtype=self.dtype)(x)
+        x = nn.Dense(
+            self.num_classes,
+            name="Head",
+            kernel_init=dense_initializer,
+            dtype=self.dtype
+        )(x)
 
         return jnp.asarray(x, self.dtype)
