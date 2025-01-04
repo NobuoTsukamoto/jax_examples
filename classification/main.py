@@ -15,14 +15,12 @@ from ml_collections import config_flags
 
 import train
 import summary
+import eval
 
 flags.DEFINE_enum(
     name="task",
     default="summarize",
-    enum_values=[
-        "train",
-        "summarize",
-    ],
+    enum_values=["train", "summarize", "eval"],
     help="Select task to perform.",
 )
 flags.DEFINE_string(name="workdir", default=None, help="Directory to store model data.")
@@ -62,6 +60,14 @@ def main(argv):
             )
 
             train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
+
+    elif FLAGS.task == "eval":
+        if FLAGS.workdir is None:
+            logging.error("If you specify train, please specify the workdir flag")
+            raise ValueError("workdir flag is None.")
+
+        else:
+            eval.evaluate(FLAGS.config, FLAGS.workdir)
 
     elif FLAGS.task == "summarize":
         summary.summarize(FLAGS.config)
