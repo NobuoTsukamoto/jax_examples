@@ -23,9 +23,9 @@ def get_config():
     # optimizer config
     config.optimizer = "rmsprop"
     config.rmsprop_decay = 0.9
-    config.rmsprop_epsilon = 1e-08
+    config.rmsprop_epsilon = 0.001
     config.momentum = 0.9
-    config.rmsprop_initial_scale = 0.0
+    config.rmsprop_initial_scale = 1.0
 
     # LR scheduler config
     config.optimizer_schedule = "warmup_exponential_decay"
@@ -44,7 +44,8 @@ def get_config():
 
     config.cache = True
     config.half_precision = True
-    config.batch_size = 2048
+    config.batch_size = 1024
+    config.gradient_accumulation_steps = 2
 
     config.label_smoothing = 0.1
     config.l2_weight_decay = 1e-5
