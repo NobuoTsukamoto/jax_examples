@@ -18,13 +18,13 @@ def get_config():
     config.model = "ConvNeXt_T"
 
     config.optimizer = "adamw"
-    config.learning_rate = 0.004
+    config.learning_rate = 0.001
     config.end_learning_rate = 1e-6
     config.weight_decay = 0.05
     config.l2_weight_decay = 0.0
     config.warmup_epochs = 20.0
     config.momentum = 0.9
-    config.batch_size = 4096
+    config.batch_size = 16
     config.model_ema_decay = 0.9999
     config.model_ema = True
     config.init_stochastic_depth_rate = 0.1
@@ -39,23 +39,7 @@ def get_config():
     config.randaug_translate_const = 250
     config.randaug_magnitude_std = 0.5
     config.randaug_prob_to_apply = None
-    config.randaug_exclude_ops = [
-        "AutoContrast",
-        "Equalize",
-        "Invert",
-        "Rotate",
-        "Posterize",
-        "Solarize",
-        "Color",
-        "Contrast",
-        "Brightness",
-        "Sharpness",
-        "ShearX",
-        "ShearY",
-        "TranslateX",
-        "TranslateY",
-        "SolarizeAdd",
-    ]
+    config.randaug_exclude_ops = ["Cutout"]
 
     # random erasing
     config.random_erasing = True
