@@ -88,13 +88,10 @@ def decay_mask_fn(params):
 def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
     """Create optimizer."""
 
-    logging.info(
-        "Optimizer: %s, weight_decay=%f",
-        config.optimizer,
-        config.weight_decay,
-    )
+    logging.info("Optimizer: %s", config.optimizer)
 
     if config.optimizer == "adamw":
+        logging.info("weight decay rate: %f", config.weight_decay)
         tx = optax.adamw(
             learning_rate=learning_rate_fn,
             weight_decay=config.weight_decay,
@@ -102,6 +99,13 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
         )
 
     elif config.optimizer == "rmsprop":
+        logging.info(
+            "decay rate: %f, momentum: %f, esp: %f, initial_scale: %f",
+            config.rmsprop_decay,
+            config.momentum,
+            config.rmsprop_epsilon,
+            config.rmsprop_initial_scale,
+        )
         tx = optax.rmsprop(
             learning_rate=learning_rate_fn,
             decay=config.rmsprop_decay,
@@ -111,6 +115,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
         )
 
     elif config.optimizer == "sgd":
+        logging.info("momentum: %f", config.momentum)
         tx = optax.sgd(
             learning_rate=learning_rate_fn,
             momentum=config.momentum,
@@ -119,7 +124,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
 
     if config.optimizer != "adamw" and config.l2_weight_decay > 0.0:
         logging.info(
-            "L2 weight decay rate. : %f",
+            "l2 weight decay rate: %f",
             config.l2_weight_decay,
         )
         tx = optax.chain(
@@ -132,13 +137,13 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
 
     if config.model_ema and config.model_ema_decay > 0.0:
         logging.info(
-            "Decay rate for the exponential moving average. : %f",
+            "Decay rate for the exponential moving average : %f",
             config.model_ema_decay,
         )
 
     if config.gradient_accumulation_steps > 1:
         logging.info(
-            "Gradient accumulation steps. : %d",
+            "Gradient accumulation steps : %d",
             config.gradient_accumulation_steps,
         )
         tx = optax.MultiSteps(tx, config.gradient_accumulation_steps)
