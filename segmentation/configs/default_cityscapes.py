@@ -14,16 +14,15 @@ def get_config():
     """Get the default hyperparameter configuration."""
     config = ml_collections.ConfigDict()
 
+    # As defined in the `models` module.
+    config.model_input = (1024, 2048)
+    config.half_precision = False
+
     # `name` argument of tensorflow_datasets.builder()
     config.dataset = "cityscapes:1.*.*"
     config.dataset_dir = "/workdir/tensorflow_datasets/"
     config.num_classes = 19
-    config.model_input = (512, 1024)
-
-    config.cache = False
-    config.shuffle_buffer_size = 8 * 128
-    config.prefetch = 10
-    config.half_precision = False
+    config.ignore_label = 255
 
     # fmt: off
     config.class_weights = [
@@ -39,28 +38,18 @@ def get_config():
     config.image_size = (1024, 2048)
     config.min_resize_value = 0.5
     config.max_resize_value = 2.0
-    config.crop_image_size = (512, 1024)
-    config.output_image_size = (512, 1024)
+    config.crop_image_size = (1024, 2048)
+    config.output_image_size = (1024, 2048)
 
-    # If num_train_steps==-1 then the number of training steps is calculated from
-    # num_epochs using the entire dataset. Similarly for steps_per_eval.
-    config.num_train_steps = -1
-    config.steps_per_eval = -1
+    # Data loader
+    config.cache = False
+    config.shuffle_buffer_size = 8 * 128
+    config.prefetch = 10
 
-    config.ignore_label = 255
-
-    config.loss = "cross_entropy_loss"
-    config.label_smoothing = 0.0
-
-    # optimizer
+    # Optimizer
     config.optimizer = "sgd"
     config.optimizer_schedule = "warmup_cosine_decay"
     config.weight_decay = 0.0001
-    config.initial_learning_rate = 0.0
-    config.learning_rate = 0.1
-    config.end_learning_rate = 0.0
-    config.exponential_decay_rate = 0.0
-    config.warmup_epochs = 5.0
     config.momentum = 0.9
     config.batch_size = 64
     config.label_smoothing = 0.0
@@ -68,9 +57,26 @@ def get_config():
     config.transition_steps = 0
     config.lr_drop_staircase = False
 
+    # Loss
+    config.loss = "cross_entropy_loss"
+
+    # LR scheduler
+    config.initial_learning_rate = 0.0
+    config.learning_rate = 0.1
+    config.end_learning_rate = 0.0
+    config.exponential_decay_rate = 0.0
+    config.warmup_epochs = 5.0
+
+    # Model EMA
     config.model_ema = False
     config.model_ema_decay = 0.0
 
+    # Gradient accumulation
     config.gradient_accumulation_steps = 1
+
+    # If num_train_steps==-1 then the number of training steps is calculated from
+    # num_epochs using the entire dataset. Similarly for steps_per_eval.
+    config.num_train_steps = -1
+    config.steps_per_eval = -1
 
     return config
