@@ -100,7 +100,7 @@ def train_step(
     stochastic_depth_rng=None,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
-    ema_decay=0.0,
+    model_ema=False,
 ):
     """Perform a single training step."""
 
@@ -178,13 +178,8 @@ def train_step(
         )
         metrics["scale"] = dynamic_scale.scale
 
-    if ema_decay > 0.0:
-        new_state = jax.lax.cond(
-            step % gradient_accumulation_steps == 0,
-            lambda _: new_state.replace(ema_params=new_state.apply_ema()),
-            lambda _: new_state,
-            None,
-        )
+    if model_ema:
+        new_state = new_state.replace(ema_params=new_state.apply_ema())
 
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
@@ -407,7 +402,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
-            ema_decay=config.model_ema_decay,
+            model_ema=config.model_ema,
         ),
         axis_name="batch",
     )
