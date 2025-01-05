@@ -47,6 +47,7 @@ imagenet2012
 | MobileNet v3 Large | TPU v2-8 | [config](./configs/imagenet_mobilenet_v3_large_tpu.py) |  | 700 | 
 | ResNet50 | TPU v2-8 | [config](./configs/imagenet_resnet50_v1_tpu.py) | 76.3 % | 100 | 25,610,152 | |
 | ResNet50 Training techniques<br>(ConvNeXt training techniques) | TPU v2-8 | [config](./configs/imagenet_resnet50_v1_training_techniques_tpu.py) | 77.96 % | 300 | 25,610,152 | override config<br>--config.batch_size=1024 \ <br> --config.gradient_accumulation_steps=4
+| EfficientNet B0 | TPU v2-8 | [config](./configs/imagenet_efficientnet_b0_tpu.py) |  | 350 | 5,330,564 |  |
 
 
 
