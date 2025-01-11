@@ -8,7 +8,7 @@
 """
 import functools
 import time
-from typing import Any, Dict
+from typing import Dict
 import math
 
 import input_pipeline
@@ -18,18 +18,18 @@ import ml_collections
 import models
 import optax
 import tensorflow_datasets as tfds
+
 from absl import logging
 from clu import metric_writers, periodic_actions
 from flax import jax_utils
-from flax.training import checkpoints
 from flax.training import common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
-from flax.training import train_state
 from jax import lax
 
 from train_state import TrainStateWithBatchNorm, TrainStateWithoutBatchNorm
 from optimizer import create_learning_rate_fn, create_optimizer
 from utils import get_input_dtype
+from checkpoint import create_checkpoint_manager, restore_checkpoint, save_checkpoint
 
 """ Training Image classfication model.
 
@@ -234,17 +234,6 @@ def create_input_iter(dataset_builder, batch_size, dtype, train, config):
     return it
 
 
-def restore_checkpoint(state, workdir):
-    return checkpoints.restore_checkpoint(workdir, state)
-
-
-def save_checkpoint(state, workdir):
-    state = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
-    step = int(state.step)
-    logging.info("Saving checkpoint step %d.", step)
-    checkpoints.save_checkpoint_multiprocess(workdir, state, step, keep=3)
-
-
 # pmean only works inside pmap because it needs an axis name.
 # This function will average the inputs across all devices.
 cross_replica_mean = jax.pmap(lambda x: lax.pmean(x, "x"), "x")
@@ -367,8 +356,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
 
     learning_rate_fn = create_learning_rate_fn(config, steps_per_epoch)
 
+    checkpoint_manager = create_checkpoint_manager(workdir, config)
+
     state, with_batchnorm = create_train_state(rngs, config, model, learning_rate_fn)
-    state = restore_checkpoint(state, workdir)
+    state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
     state = jax_utils.replicate(state)
@@ -490,7 +481,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
             if with_batchnorm:
                 state = sync_batch_stats(state)
-            save_checkpoint(state, workdir)
+            save_checkpoint(checkpoint_manager, state)
 
     # Wait until computations are done before exiting
     jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
