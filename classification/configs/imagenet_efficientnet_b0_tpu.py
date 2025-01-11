@@ -44,8 +44,8 @@ def get_config():
 
     config.cache = True
     config.half_precision = True
-    config.batch_size = 1024
-    config.gradient_accumulation_steps = 2
+    config.batch_size = 2048
+    config.gradient_accumulation_steps = 1
 
     config.label_smoothing = 0.1
     config.l2_weight_decay = 1e-5
@@ -54,6 +54,6 @@ def get_config():
     config.model_ema = True
     config.init_stochastic_depth_rate = 0.2
 
-    config.num_epochs = 350
+    config.num_epochs = 500
 
     return config
