@@ -379,7 +379,7 @@ class InvertedResBlockEfficientNet(nn.Module):
         in_filters = x.shape[-1]
 
         se_bolock = partial(
-            SeBlock, conv=self.conv, act1=self.act, act2=jnn.swish, divisor=2
+            SeBlock, conv=self.conv, act1=self.act, act2=jnn.sigmoid, divisor=2
         )
         features = int(in_filters * self.expansion)
 

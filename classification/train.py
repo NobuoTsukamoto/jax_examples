@@ -101,7 +101,6 @@ def train_step(
     stochastic_depth_rng=None,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
-    model_ema=False,
 ):
     """Perform a single training step."""
 

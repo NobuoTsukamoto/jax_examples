@@ -17,9 +17,6 @@ def get_config():
     # As defined in the `models` module.
     config.model = "EfficientNet_B0"
 
-    # dataset
-    config.dataset = "imagenet2012:5.*.*"
-
     # optimizer config
     config.optimizer = "rmsprop"
     config.rmsprop_decay = 0.9
@@ -30,10 +27,10 @@ def get_config():
     # LR scheduler config
     config.optimizer_schedule = "warmup_exponential_decay"
     config.initial_learning_rate = 0.0
-    config.learning_rate = 0.128  # 0.016 * batch_size(2048) / 256
+    config.learning_rate = 0.001  # 0.016 * batch_size(16) / 256
     config.warmup_epochs = 5
     config.exponential_decay_rate = 0.97
-    config.transition_steps = 1502  # 2.4 * steps_per_epoch (626)
+    config.transition_steps = 1291  # 2.4 * steps_per_epoch (538)
     config.lr_drop_staircase = True
 
     # Auto augment
@@ -42,10 +39,9 @@ def get_config():
     config.autoaug_cutout_const = 100
     config.autoaug_translate_const = 250
 
-    config.cache = True
-    config.half_precision = True
-    config.batch_size = 2048
-    config.gradient_accumulation_steps = 1
+    config.cache = False
+    config.half_precision = False
+    config.batch_size = 16
 
     config.label_smoothing = 0.1
     config.l2_weight_decay = 1e-5
@@ -54,6 +50,6 @@ def get_config():
     config.model_ema = True
     config.init_stochastic_depth_rate = 0.2
 
-    config.num_epochs = 500
+    config.num_epochs = 350
 
     return config
