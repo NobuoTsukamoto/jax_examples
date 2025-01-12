@@ -12,6 +12,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_models as tfm
 import ml_collections
+from absl import logging
 
 
 """ Input Pipline
@@ -169,13 +170,32 @@ def create_split(
 
         num_classes = dataset_builder.info.features["label"].num_classes
 
+        logging.info("Data augument type: %s", config.aug_type)
+
         if config.aug_type == "autoaug":
+            logging.info(
+                "augmentation_name: %s, cutout_const: %d, cutout_const: %d",
+                config.autoaug_augmentation_name,
+                config.autoaug_cutout_const,
+                config.autoaug_translate_const,
+            )
             augmenter = tfm.vision.augment.AutoAugment(
                 augmentation_name=config.autoaug_augmentation_name,
                 cutout_const=config.autoaug_cutout_const,
                 translate_const=config.autoaug_translate_const,
             )
         elif config.aug_type == "randaug":
+            logging.info(
+                "num_layers: %d, magnitude: %f, cutout_const: %f, translate_const: %f, "
+                "magnitude_std: %f, prob_to_apply: %f, exclude_ops :%s",
+                config.randaug_num_layers,
+                config.randaug_magnitude,
+                config.randaug_cutout_const,
+                config.randaug_translate_const,
+                config.randaug_magnitude_std,
+                config.randaug_prob_to_apply,
+                config.randaug_exclude_ops,
+            )
             augmenter = tfm.vision.augment.RandAugment(
                 num_layers=config.randaug_num_layers,
                 magnitude=config.randaug_magnitude,
@@ -186,7 +206,20 @@ def create_split(
                 exclude_ops=config.randaug_exclude_ops,
             )
 
+        logging.info("Random erasing: %s", config.random_erasing)
         if config.random_erasing:
+            logging.info(
+                "probability: %f, min_area: %f, max_area: %f, min_aspect: %f, "
+                "max_aspect: %f, min_count: %d, max_count: %d, trials: %d",
+                config.random_erasing_probability,
+                config.random_erasing_min_area,
+                config.random_erasing_max_area,
+                config.random_erasing_min_aspect,
+                config.random_erasing_max_aspect,
+                config.random_erasing_min_count,
+                config.random_erasing_max_count,
+                config.random_erasing_trials,
+            )
             random_erasing = tfm.vision.augment.RandomErasing(
                 probability=config.random_erasing_probability,
                 min_area=config.random_erasing_min_area,
@@ -198,7 +231,18 @@ def create_split(
                 trials=config.random_erasing_trials,
             )
 
+        logging.info("Mixup and Cutmix: %s", config.mixup_and_cutmix)
         if config.mixup_and_cutmix:
+            logging.info(
+                "mixup_alpha: %f, cutmix_alpha: %f, prob: %f, switch_prob: %f, ",
+                "label_smoothing: %f, num_classes: %d",
+                config.mixup_and_cutmix_mixup_alpha,
+                config.mixup_and_cutmix_cutmix_alpha,
+                config.mixup_and_cutmix_prob,
+                config.mixup_and_cutmix_switch_prob,
+                config.mixup_and_cutmix_label_smoothing,
+                num_classes,
+            )
             postprocess_fn = tfm.vision.augment.MixupAndCutmix(
                 mixup_alpha=config.mixup_and_cutmix_mixup_alpha,
                 cutmix_alpha=config.mixup_and_cutmix_cutmix_alpha,
