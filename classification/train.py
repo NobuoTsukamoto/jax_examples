@@ -8,7 +8,7 @@
 """
 import functools
 import time
-from typing import Any, Dict
+from typing import Dict
 import math
 
 import input_pipeline
@@ -18,17 +18,18 @@ import ml_collections
 import models
 import optax
 import tensorflow_datasets as tfds
+
 from absl import logging
 from clu import metric_writers, periodic_actions
 from flax import jax_utils
-from flax.training import checkpoints
 from flax.training import common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
-from flax.training import train_state
 from jax import lax
 
+from train_state import TrainStateWithBatchNorm, TrainStateWithoutBatchNorm
 from optimizer import create_learning_rate_fn, create_optimizer
 from utils import get_input_dtype
+from checkpoint import create_checkpoint_manager, restore_checkpoint, save_checkpoint
 
 """ Training Image classfication model.
 
@@ -100,7 +101,6 @@ def train_step(
     stochastic_depth_rng=None,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
-    model_ema=False,
 ):
     """Perform a single training step."""
 
@@ -178,15 +178,16 @@ def train_step(
         )
         metrics["scale"] = dynamic_scale.scale
 
-    if model_ema:
-        new_state = new_state.replace(ema_params=new_state.apply_ema())
+    if state.ema_tx is not None and state.ema_state is not None:
+        _, new_ema_state = state.ema_tx.update(new_state.params, state.ema_state)
+        new_state = new_state.replace(ema_state=new_ema_state)
 
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
 
 def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
     if model_ema:
-        params = state.ema_params
+        params = state.ema_state.ema
     else:
         params = state.params
 
@@ -228,44 +229,6 @@ def create_input_iter(dataset_builder, batch_size, dtype, train, config):
     return it
 
 
-class TrainStateWithBatchNorm(train_state.TrainState):
-    batch_stats: Any
-    dynamic_scale: dynamic_scale_lib.DynamicScale
-    ema_decay: float = 0.0
-    ema_params: Any = None
-
-    def apply_ema(self):
-        return jax.tree_util.tree_map(
-            lambda ema, param: (ema * self.ema_decay + param * (1.0 - self.ema_decay)),
-            self.ema_params,
-            self.params,
-        )
-
-
-class TrainStateWithoutBatchNorm(train_state.TrainState):
-    dynamic_scale: dynamic_scale_lib.DynamicScale
-    ema_decay: float = 0.0
-    ema_params: Any = None
-
-    def apply_ema(self):
-        return jax.tree_util.tree_map(
-            lambda ema, param: (ema * self.ema_decay + param * (1.0 - self.ema_decay)),
-            self.ema_params,
-            self.params,
-        )
-
-
-def restore_checkpoint(state, workdir):
-    return checkpoints.restore_checkpoint(workdir, state)
-
-
-def save_checkpoint(state, workdir):
-    state = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
-    step = int(state.step)
-    logging.info("Saving checkpoint step %d.", step)
-    checkpoints.save_checkpoint_multiprocess(workdir, state, step, keep=3)
-
-
 # pmean only works inside pmap because it needs an axis name.
 # This function will average the inputs across all devices.
 cross_replica_mean = jax.pmap(lambda x: lax.pmean(x, "x"), "x")
@@ -295,6 +258,12 @@ def create_train_state(
     params, batch_stats = initialized(rngs, config.image_size, model)
     tx = create_optimizer(config, learning_rate_fn)
 
+    ema_tx = None
+    ema_state = None
+    if config.model_ema:
+        ema_tx = optax.ema(config.model_ema_decay)
+        ema_state = ema_tx.init(params)
+
     if batch_stats is not None:
         state = TrainStateWithBatchNorm.create(
             apply_fn=model.apply,
@@ -302,8 +271,8 @@ def create_train_state(
             tx=tx,
             batch_stats=batch_stats,
             dynamic_scale=dynamic_scale,
-            ema_params=params,
-            ema_decay=config.model_ema_decay,
+            ema_tx=ema_tx,
+            ema_state=ema_state,
         )
         with_batchnorm = True
     else:
@@ -313,8 +282,8 @@ def create_train_state(
             params=params,
             tx=tx,
             dynamic_scale=dynamic_scale,
-            ema_params=params,
-            ema_decay=config.model_ema_decay,
+            ema_tx=ema_tx,
+            ema_state=ema_state,
         )
         with_batchnorm = False
 
@@ -374,7 +343,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         steps_per_eval = config.steps_per_eval
 
     logging.info(
-        "Steps per epech : %d, Step per eval : %d.", steps_per_epoch, steps_per_eval
+        "Steps per epech: %d, Step per eval: %d.", steps_per_epoch, steps_per_eval
     )
 
     steps_per_checkpoint = steps_per_epoch
@@ -387,9 +356,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     )
 
     learning_rate_fn = create_learning_rate_fn(config, steps_per_epoch)
-
     state, with_batchnorm = create_train_state(rngs, config, model, learning_rate_fn)
-    state = restore_checkpoint(state, workdir)
+
+    checkpoint_manager = create_checkpoint_manager(workdir, config)
+    state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
     state = jax_utils.replicate(state)
@@ -511,7 +481,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
             if with_batchnorm:
                 state = sync_batch_stats(state)
-            save_checkpoint(state, workdir)
+            save_checkpoint(checkpoint_manager, state)
 
     # Wait until computations are done before exiting
     jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
