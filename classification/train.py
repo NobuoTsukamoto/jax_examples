@@ -372,7 +372,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
-            model_ema=config.model_ema,
         ),
         axis_name="batch",
     )
