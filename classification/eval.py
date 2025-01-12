@@ -16,6 +16,7 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 import models
+import optax
 import tensorflow_datasets as tfds
 from absl import logging
 from flax import jax_utils
@@ -55,7 +56,7 @@ def compute_metrics(logits, labels, num_classes):
 
 def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
     if model_ema:
-        params = state.ema_params
+        params = state.ema_state.ema
     else:
         params = state.params
 
@@ -86,6 +87,12 @@ def create_eval_state(
     params, batch_stats = initialized(rngs, config.image_size, model)
     tx = create_optimizer(config, learning_rate_fn)
 
+    ema_tx = None
+    ema_state = None
+    if config.model_ema:
+        ema_tx = optax.ema(config.model_ema_decay)
+        ema_state = ema_tx.init(params)
+
     if batch_stats is not None:
         state = TrainStateWithBatchNorm.create(
             apply_fn=model.apply,
@@ -93,8 +100,8 @@ def create_eval_state(
             tx=tx,
             batch_stats=batch_stats,
             dynamic_scale=dynamic_scale,
-            ema_params=params,
-            ema_decay=config.model_ema_decay,
+            ema_tx=ema_tx,
+            ema_state=ema_state,
         )
         with_batchnorm = True
     else:
@@ -104,8 +111,8 @@ def create_eval_state(
             params=params,
             tx=tx,
             dynamic_scale=dynamic_scale,
-            ema_params=params,
-            ema_decay=config.model_ema_decay,
+            ema_tx=ema_tx,
+            ema_state=ema_state,
         )
         with_batchnorm = False
 
