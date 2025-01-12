@@ -15,6 +15,7 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 import orbax
+import orbax.checkpoint
 import tensorflow_datasets as tfds
 
 from absl import logging
@@ -33,6 +34,7 @@ from loss import create_loss_fn
 
 from optimizer import create_learning_rate_fn, create_optimizer
 from utils import get_input_dtype
+from checkpoint import create_checkpoint_manager, restore_checkpoint, save_checkpoint
 
 
 def create_model(
@@ -219,27 +221,6 @@ class TrainState(train_state.TrainState):
     dynamic_scale: dynamic_scale_lib.DynamicScale
 
 
-def restore_checkpoint(checkpoint_manager, state):
-    restore_args = orbax_utils.restore_args_from_target(state, mesh=None)
-    if checkpoint_manager.latest_step() is not None:
-        return checkpoint_manager.restore(
-            checkpoint_manager.latest_step(),
-            items=state,
-            restore_kwargs={"restore_args": restore_args},
-        )
-    else:
-        return state
-
-
-def save_checkpoint(checkpoint_manager, state):
-    if jax.process_index() == 0:
-        # get train state from the first replica
-        state = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
-        save_args = orbax_utils.save_args_from_target(state)
-        step = int(state.step)
-        checkpoint_manager.save(step, state, save_kwargs={"save_args": save_args})
-
-
 # pmean only works inside pmap because it needs an axis name.
 # This function will average the inputs across all devices.
 cross_replica_mean = jax.pmap(lambda x: lax.pmean(x, "x"), "x")
@@ -343,14 +324,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str) -> Train
 
     learning_rate_fn = create_learning_rate_fn(config, steps_per_epoch)
 
-    checkpoint_manager_options = orbax.checkpoint.CheckpointManagerOptions(
-        create=True, max_to_keep=3
-    )
-    checkpoint_manager = orbax.checkpoint.CheckpointManager(
-        workdir,
-        orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler()),
-        checkpoint_manager_options,
-    )
+    checkpoint_manager = create_checkpoint_manager(workdir, config)
 
     loss_fn = create_loss_fn(config)
 
