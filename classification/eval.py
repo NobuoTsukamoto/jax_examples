@@ -16,11 +16,9 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 import models
-import optax
 import tensorflow_datasets as tfds
 from absl import logging
 from flax import jax_utils
-from flax.training import checkpoints
 from flax.training import common_utils
 from flax.training import dynamic_scale as dynamic_scale_lib
 from jax import lax
@@ -30,6 +28,7 @@ from train_state import TrainStateWithBatchNorm, TrainStateWithoutBatchNorm
 from optimizer import create_learning_rate_fn, create_optimizer
 from utils import get_input_dtype
 from loss import cross_entropy_loss
+from checkpoint import create_checkpoint_manager, restore_checkpoint
 
 """ Eval Image classfication model.
 
@@ -68,10 +67,6 @@ def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
         logits = state.apply_fn(variables, batch["image"], train=False)
 
     return compute_metrics(logits, batch["label"], num_classes)
-
-
-def restore_checkpoint(state, workdir):
-    return checkpoints.restore_checkpoint(workdir, state)
 
 
 def create_eval_state(
@@ -169,7 +164,9 @@ def evaluate(config: ml_collections.ConfigDict, workdir: str):
 
     learning_rate_fn = create_learning_rate_fn(config, steps_per_epoch)
     state, with_batchnorm = create_eval_state(rngs, config, model, learning_rate_fn)
-    state = restore_checkpoint(state, workdir)
+
+    checkpoint_manager = create_checkpoint_manager(workdir, config)
+    state = restore_checkpoint(checkpoint_manager, state)
     state = jax_utils.replicate(state)
 
     logging.info("Restored checkpoint.")
