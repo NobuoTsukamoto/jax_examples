@@ -101,6 +101,8 @@ def get_config():
 
     config.max_to_keep_checkpoint = 5
 
+    config.profile = True
+
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.
     config.num_train_steps = -1

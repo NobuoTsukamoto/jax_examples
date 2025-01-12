@@ -397,8 +397,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     )
     train_metrics = []
     hooks = []
-    if jax.process_index() == 0:
-        hooks += [periodic_actions.Profile(num_profile_steps=5, logdir=workdir)]
+    if jax.process_index() == 0 and config.profile:
+        hooks += [
+            periodic_actions.Profile(
+                num_profile_steps=3, profile_duration_ms=None, logdir=workdir
+            )
+        ]
     train_metrics_last_t = time.time()
     logging.info("Initial compilation, this might take some minutes...")
 
