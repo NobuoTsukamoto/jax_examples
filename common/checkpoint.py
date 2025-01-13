@@ -41,7 +41,6 @@ def restore_checkpoint(checkpoint_manager, state):
 
 
 def save_checkpoint(checkpoint_manager, state):
-    state = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
     save_args = orbax_utils.save_args_from_target(state)
     step = int(state.step)
     checkpoint_manager.save(step, state, save_kwargs={"save_args": save_args})
