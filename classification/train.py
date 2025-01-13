@@ -153,7 +153,8 @@ def train_step(
 
     if with_batchnorm:
         new_state = state.apply_gradients(
-            grads=grads, batch_stats=new_model_state["batch_stats"]
+            grads=grads,
+            batch_stats=lax.pmean(new_model_state["batch_stats"], "batch"),
         )
     else:
         new_state = state.apply_gradients(grads=grads)
@@ -223,18 +224,6 @@ def create_input_iter(dataset_builder, batch_size, dtype, train, config):
     it = map(prepare_tf_data, ds)
     it = jax_utils.prefetch_to_device(it, 2)
     return it
-
-
-# pmean only works inside pmap because it needs an axis name.
-# This function will average the inputs across all devices.
-cross_replica_mean = jax.pmap(lambda x: lax.pmean(x, "x"), "x")
-
-
-def sync_batch_stats(state):
-    """Sync the batch statistics across replicas."""
-    # Each device has its own version of the running average batch statistics and
-    # we sync them before evaluation.
-    return state.replace(batch_stats=cross_replica_mean(state.batch_stats))
 
 
 def create_train_state(
@@ -360,7 +349,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
-    state = jax_utils.replicate(state)
 
     p_train_step = jax.pmap(
         functools.partial(
@@ -371,12 +359,15 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             with_batchnorm=with_batchnorm,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
         ),
+        in_axes=(None, 0),
+        out_axes=(None, 0, 0),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
         functools.partial(
             eval_step, num_classes=num_classes, with_batchnorm=with_batchnorm
         ),
+        in_axes=(None, 0),
         axis_name="batch",
     )
     p_ema_eval_step = jax.pmap(
@@ -386,6 +377,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             with_batchnorm=with_batchnorm,
             model_ema=True,
         ),
+        in_axes=(None, 0),
         axis_name="batch",
     )
 
@@ -433,10 +425,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             epoch = step // steps_per_epoch
             eval_metrics = []
 
-            if with_batchnorm:
-                # sync batch statistics across replicas
-                state = sync_batch_stats(state)
-
             for _ in range(steps_per_eval):
                 eval_batch = next(eval_iter)
                 metrics = p_eval_step(state, eval_batch)
@@ -477,8 +465,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                 writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            if with_batchnorm:
-                state = sync_batch_stats(state)
             save_checkpoint(checkpoint_manager, state)
 
     # Wait until computations are done before exiting
