@@ -97,17 +97,13 @@ def train_step(
     learning_rate_fn,
     num_classes,
     label_smoothing=0.0,
-    dropout_rng=None,
-    stochastic_depth_rng=None,
+    rng=None,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
 ):
     """Perform a single training step."""
 
-    dropout_rng, new_dropout_rng = jax.random.split(dropout_rng)
-    stochastic_depth_rng, new_stochastic_depth_rng = jax.random.split(
-        stochastic_depth_rng
-    )
+    dropout_rng, stochastic_depth_rng, next_rng = jax.random.split(rng, 3)
 
     def loss_fn(params):
         """loss function used for training."""
@@ -157,7 +153,8 @@ def train_step(
 
     if with_batchnorm:
         new_state = state.apply_gradients(
-            grads=grads, batch_stats=new_model_state["batch_stats"]
+            grads=grads,
+            batch_stats=lax.pmean(new_model_state["batch_stats"], "batch"),
         )
     else:
         new_state = state.apply_gradients(grads=grads)
@@ -182,7 +179,7 @@ def train_step(
         _, new_ema_state = state.ema_tx.update(new_state.params, state.ema_state)
         new_state = new_state.replace(ema_state=new_ema_state)
 
-    return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
+    return new_state, metrics, next_rng
 
 
 def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
@@ -227,18 +224,6 @@ def create_input_iter(dataset_builder, batch_size, dtype, train, config):
     it = map(prepare_tf_data, ds)
     it = jax_utils.prefetch_to_device(it, 2)
     return it
-
-
-# pmean only works inside pmap because it needs an axis name.
-# This function will average the inputs across all devices.
-cross_replica_mean = jax.pmap(lambda x: lax.pmean(x, "x"), "x")
-
-
-def sync_batch_stats(state):
-    """Sync the batch statistics across replicas."""
-    # Each device has its own version of the running average batch statistics and
-    # we sync them before evaluation.
-    return state.replace(batch_stats=cross_replica_mean(state.batch_stats))
 
 
 def create_train_state(
@@ -301,8 +286,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         logdir=workdir, just_logging=jax.process_index() != 0
     )
 
-    rng = jax.random.PRNGKey(seed=config.seed)
-    params_rng, dropout_rng, stochastic_depth_rng = jax.random.split(rng, num=3)
+    rng = jax.random.key(seed=config.seed)
+    params_rng, dropout_rng, stochastic_depth_rng, train_rng = jax.random.split(
+        rng, num=4
+    )
     rngs = {
         "params": params_rng,
         "dropout": dropout_rng,
@@ -362,7 +349,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
-    state = jax_utils.replicate(state)
 
     p_train_step = jax.pmap(
         functools.partial(
@@ -373,12 +359,15 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             with_batchnorm=with_batchnorm,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
         ),
+        in_axes=(None, 0),
+        out_axes=(None, 0, 0),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
         functools.partial(
             eval_step, num_classes=num_classes, with_batchnorm=with_batchnorm
         ),
+        in_axes=(None, 0),
         axis_name="batch",
     )
     p_ema_eval_step = jax.pmap(
@@ -388,12 +377,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             with_batchnorm=with_batchnorm,
             model_ema=True,
         ),
+        in_axes=(None, 0),
         axis_name="batch",
     )
-    dropout_rngs = jax.random.split(dropout_rng, jax.local_device_count())
-    stochastic_depth_rngs = jax.random.split(
-        stochastic_depth_rng, jax.local_device_count()
-    )
+
+    train_rng = jax.random.split(train_rng, jax.local_device_count())
     train_metrics = []
     hooks = []
     if jax.process_index() == 0 and config.profile:
@@ -406,11 +394,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     logging.info("Initial compilation, this might take some minutes...")
 
     for step, batch in zip(range(step_offset, num_steps), train_iter):
-        state, metrics, dropout_rngs, stochastic_depth_rngs = p_train_step(
+        state, metrics, train_rng = p_train_step(
             state,
             batch,
-            dropout_rng=dropout_rngs,
-            stochastic_depth_rng=stochastic_depth_rngs,
+            rng=train_rng,
         )
         for h in hooks:
             h(step)
@@ -437,10 +424,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         if (step + 1) % steps_per_epoch == 0:
             epoch = step // steps_per_epoch
             eval_metrics = []
-
-            if with_batchnorm:
-                # sync batch statistics across replicas
-                state = sync_batch_stats(state)
 
             for _ in range(steps_per_eval):
                 eval_batch = next(eval_iter)
@@ -482,11 +465,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                 writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            if with_batchnorm:
-                state = sync_batch_stats(state)
             save_checkpoint(checkpoint_manager, state)
 
     # Wait until computations are done before exiting
-    jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
+    jax.random.normal(jax.random.key(seed=config.seed), ()).block_until_ready()
 
     return state
