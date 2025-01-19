@@ -174,7 +174,7 @@ def create_split(
 
         if config.aug_type == "autoaug":
             logging.info(
-                "augmentation_name: %s, cutout_const: %d, cutout_const: %d",
+                "augmentation_name: %s, cutout_const: %d, autoaug_translate_const: %d",
                 config.autoaug_augmentation_name,
                 config.autoaug_cutout_const,
                 config.autoaug_translate_const,
