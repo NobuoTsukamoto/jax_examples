@@ -91,11 +91,14 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
     logging.info("Optimizer: %s", config.optimizer)
 
     if config.optimizer == "adamw":
-        logging.info("weight decay rate: %f", config.weight_decay)
+        logging.info(
+            "weight decay rate: %f, esp: %f", config.weight_decay, config.adam_epsilon
+        )
         tx = optax.adamw(
             learning_rate=learning_rate_fn,
             weight_decay=config.weight_decay,
             mask=decay_mask_fn,
+            eps=config.adam_epsilon,
         )
 
     elif config.optimizer == "rmsprop":

@@ -22,6 +22,7 @@ def get_config():
 
     # optimizer config
     config.optimizer = "adamw"
+    config.adam_epsilon = 1e-7
     config.weight_decay = 0.1
     config.l2_weight_decay = 0.0
 
