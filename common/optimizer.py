@@ -70,6 +70,20 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
     return schedule_fn
 
 
+def adamw_decay_mask_fn(params):
+    flat_params = traverse_util.flatten_dict(params)
+    flat_mask = {
+        path: (
+            path[-1] != "bias"
+            and "LayerNorm" not in path[-2]
+            and "BatchNorm" not in path[-2]
+            and "LayerScale" not in path[-2]
+        )
+        for path in flat_params
+    }
+    return traverse_util.unflatten_dict(flat_mask)
+
+
 def decay_mask_fn(params):
     flat_params = traverse_util.flatten_dict(params)
     flat_mask = {
@@ -97,7 +111,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
         tx = optax.adamw(
             learning_rate=learning_rate_fn,
             weight_decay=config.weight_decay,
-            mask=decay_mask_fn,
+            mask=adamw_decay_mask_fn,
             eps=config.adam_epsilon,
         )
 
