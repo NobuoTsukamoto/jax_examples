@@ -72,15 +72,8 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
 
 def adamw_decay_mask_fn(params):
     flat_params = traverse_util.flatten_dict(params)
-    flat_mask = {
-        path: (
-            path[-1] != "bias"
-            and "LayerNorm" not in path[-2]
-            and "BatchNorm" not in path[-2]
-            and "LayerScale" not in path[-2]
-        )
-        for path in flat_params
-    }
+    flat_mask = {path: ("BatchNorm" not in path[-2]) for path in flat_params}
+    print(flat_mask)
     return traverse_util.unflatten_dict(flat_mask)
 
 
