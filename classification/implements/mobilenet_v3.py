@@ -10,6 +10,7 @@
 from functools import partial
 from typing import Any, Callable, Dict, Optional
 
+import jax
 import jax.numpy as jnp
 import jax.nn as jnn
 from flax import linen as nn
@@ -27,6 +28,11 @@ ModuleDef = Any
         https://github.com/keras-team/keras-applications/blob/06fbeb0f16e1304f239b2296578d1c50b15a983a/keras_applications/mobilenet_v3.py
         https://github.com/tensorflow/models/blob/v2.18.0/official/vision/modeling/backbones/mobilenet.py
 """
+
+def random_uniform_initializer(minval=-0.05, maxval=0.05):
+    def init_fn(key, shape, dtype=jnp.float32):
+        return jax.random.uniform(key, shape, dtype, minval=minval, maxval=maxval)
+    return init_fn
 
 
 class MobileNetV3Backbone(nn.Module):
@@ -93,7 +99,10 @@ class MobileNetV3(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        conv = partial(nn.Conv, use_bias=False, dtype=self.dtype)
+        kernel_initializer = random_uniform_initializer(-0.05, 0.05)
+        conv = partial(
+            nn.Conv, use_bias=False, kernel_init=kernel_initializer, dtype=self.dtype
+        )
         norm = partial(
             nn.BatchNorm,
             use_running_average=not train,
