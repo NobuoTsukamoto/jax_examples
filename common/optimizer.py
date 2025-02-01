@@ -103,7 +103,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
         tx = optax.adamw(
             learning_rate=learning_rate_fn,
             weight_decay=config.weight_decay,
-            mask=adamw_decay_mask_fn,
+            mask=decay_mask_fn,
             eps=config.adam_epsilon,
         )
 
