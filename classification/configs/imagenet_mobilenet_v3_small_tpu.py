@@ -48,4 +48,6 @@ def get_config():
 
     config.num_epochs = 1000
 
+    config.use_sync_batch_norm = True
+
     return config

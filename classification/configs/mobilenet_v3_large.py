@@ -34,5 +34,6 @@ def get_config():
 
     config.model_ema_decay = 0.9999
     config.model_ema = True
+    config.use_sync_batch_norm = False
 
     return config

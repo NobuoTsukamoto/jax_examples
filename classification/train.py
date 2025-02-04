@@ -438,7 +438,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             epoch = step // steps_per_epoch
             eval_metrics = []
 
-            if with_batchnorm:
+            if with_batchnorm and config.use_sync_batch_norm:
+                logging.info("Sync batch statistics across replicas.")
                 # sync batch statistics across replicas
                 state = sync_batch_stats(state)
 
@@ -482,7 +483,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                 writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            if with_batchnorm:
+            if with_batchnorm and config.use_sync_batch_norm:
                 state = sync_batch_stats(state)
             save_checkpoint(checkpoint_manager, state)
 
