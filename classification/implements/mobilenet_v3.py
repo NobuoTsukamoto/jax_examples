@@ -29,9 +29,11 @@ ModuleDef = Any
         https://github.com/tensorflow/models/blob/v2.18.0/official/vision/modeling/backbones/mobilenet.py
 """
 
+
 def random_uniform_initializer(minval=-0.05, maxval=0.05):
     def init_fn(key, shape, dtype=jnp.float32):
         return jax.random.uniform(key, shape, dtype, minval=minval, maxval=maxval)
+
     return init_fn
 
 
