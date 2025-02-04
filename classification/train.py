@@ -439,7 +439,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             eval_metrics = []
 
             if with_batchnorm and config.use_sync_batch_norm:
-                logging.info("Sync batch statistics across replicas.")
                 # sync batch statistics across replicas
                 state = sync_batch_stats(state)
 
