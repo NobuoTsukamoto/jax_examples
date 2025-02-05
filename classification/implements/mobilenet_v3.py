@@ -30,13 +30,6 @@ ModuleDef = Any
 """
 
 
-def random_uniform_initializer(minval=-0.05, maxval=0.05):
-    def init_fn(key, shape, dtype=jnp.float32):
-        return jax.random.uniform(key, shape, dtype, minval=minval, maxval=maxval)
-
-    return init_fn
-
-
 class MobileNetV3Backbone(nn.Module):
     """MobileNet V3 Backbone."""
 
@@ -101,7 +94,9 @@ class MobileNetV3(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        kernel_initializer = random_uniform_initializer(-0.05, 0.05)
+        kernel_initializer = jax.nn.initializers.variance_scaling(
+            scale=1.0, mode="fan_in", distribution="truncated_normal"
+        )
         conv = partial(
             nn.Conv, use_bias=False, kernel_init=kernel_initializer, dtype=self.dtype
         )
