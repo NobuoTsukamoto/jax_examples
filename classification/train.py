@@ -28,6 +28,7 @@ from jax import lax
 
 from train_state import TrainStateWithBatchNorm, TrainStateWithoutBatchNorm
 from optimizer import create_learning_rate_fn, create_optimizer
+from model_ema import ema_v2
 from utils import get_input_dtype
 from checkpoint import create_checkpoint_manager, restore_checkpoint, save_checkpoint
 
@@ -261,7 +262,8 @@ def create_train_state(
     ema_tx = None
     ema_state = None
     if config.model_ema:
-        ema_tx = optax.ema(config.model_ema_decay)
+        # ema_tx = optax.ema(config.model_ema_decay)
+        ema_tx = ema_v2(config.model_ema_decay)
         ema_state = ema_tx.init(params)
 
     if batch_stats is not None:
@@ -459,7 +461,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             )
             writer.flush()
 
-            if config.model_ema_decay > 0.0 and config.model_ema:
+            if config.model_ema:
                 eval_ema_metrics = []
                 for _ in range(steps_per_eval):
                     eval_batch = next(eval_iter)
