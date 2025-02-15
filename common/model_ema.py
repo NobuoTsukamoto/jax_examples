@@ -30,6 +30,7 @@ def ema_v2(
     def update_fn(updates, state, params=None):
         del params
         count_inc = numerics.safe_increment(state.count)
+        decay = count_inc
         new_decay = jnp.minimum(decay, (1.0 + decay) / (10.0 + decay))
         updates = new_ema = otu.tree_update_moment(
             updates, state.ema, new_decay, order=1
