@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+    Copyright (c) 2025 Nobuo Tsukamoto
+    This software is released under the MIT License.
+    See the LICENSE file in the project root for more information.
+"""
+
 from typing import Any, Optional
 
 import jax.numpy as jnp
@@ -20,6 +29,7 @@ def ema_v2(
     """
 
     accumulator_dtype = utils.canonicalize_dtype(accumulator_dtype)
+    average_decay = decay
 
     def init_fn(params):
         return EmaState(
@@ -29,9 +39,10 @@ def ema_v2(
 
     def update_fn(updates, state, params=None):
         del params
+        new_decay = jnp.minimum(
+            average_decay, (1.0 + state.count) / (10.0 + state.count)
+        )
         count_inc = numerics.safe_increment(state.count)
-        decay = count_inc
-        new_decay = jnp.minimum(decay, (1.0 + decay) / (10.0 + decay))
         updates = new_ema = otu.tree_update_moment(
             updates, state.ema, new_decay, order=1
         )
