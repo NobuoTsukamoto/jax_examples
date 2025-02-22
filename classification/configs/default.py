@@ -49,7 +49,9 @@ def get_config():
     config.half_precision = False
 
     config.model_ema = False
+    config.model_ema_type = "v1" # v1, v2
     config.model_ema_decay = 0.0
+    config.model_ema_trainable_weights_only = True
 
     config.gradient_accumulation_steps = 1
 

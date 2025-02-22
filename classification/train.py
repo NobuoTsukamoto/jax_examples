@@ -179,27 +179,44 @@ def train_step(
         )
         metrics["scale"] = dynamic_scale.scale
 
-    if state.ema_tx is not None and state.ema_state is not None:
-        _, new_ema_state = state.ema_tx.update(new_state.params, state.ema_state)
+    if state.ema_tx is not None:
+        _, new_ema_state = new_state.ema_tx.update(
+            new_state.params, new_state.ema_state
+        )
         new_state = new_state.replace(ema_state=new_ema_state)
+
+        if new_state.ema_batch_stats is not None:
+            _, new_ema_batch_stats = new_state.ema_tx.update(
+                new_state.batch_stats, new_state.ema_batch_stats
+            )
+            new_state = new_state.replace(ema_batch_stats=new_ema_batch_stats)
 
     return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
 
 
-def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
+def eval_step(
+    state, batch, num_classes, with_batchnorm, label_smoothing, model_ema=False
+):
     if model_ema:
         params = state.ema_state.ema
+        if state.ema_batch_stats is not None:
+            batch_stats = state.ema_batch_stats.ema
+        else:
+            batch_stats = state.batch_stats
     else:
         params = state.params
+        batch_stats = state.batch_stats
 
     if with_batchnorm:
-        variables = {"params": params, "batch_stats": state.batch_stats}
+        variables = {"params": params, "batch_stats": batch_stats}
         logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     else:
         variables = {"params": params}
         logits = state.apply_fn(variables, batch["image"], train=False)
 
-    return compute_metrics(logits, batch["label"], num_classes)
+    return compute_metrics(
+        logits, batch["label"], num_classes, label_smoothing=label_smoothing
+    )
 
 
 def prepare_tf_data(xs):
@@ -261,10 +278,26 @@ def create_train_state(
 
     ema_tx = None
     ema_state = None
+    ema_batch_stats = None
     if config.model_ema:
-        # ema_tx = optax.ema(config.model_ema_decay)
-        ema_tx = ema_v2(config.model_ema_decay)
+        logging.info(
+            "Model EMA %s, Decay rate: %f, Trainable weights only: %s",
+            config.model_ema_type,
+            config.model_ema_decay,
+            config.model_ema_trainable_weights_only,
+        )
+
+        if config.model_ema_type == "v1":
+            ema_tx = optax.ema(config.model_ema_decay)
+        elif config.model_ema_type == "v2":
+            ema_tx = ema_v2(config.model_ema_decay)
+        else:
+            logging.error("model_ema_type is incorrect")
+
         ema_state = ema_tx.init(params)
+
+        if not config.model_ema_trainable_weights_only:
+            ema_batch_stats = ema_tx.init(batch_stats)
 
     if batch_stats is not None:
         state = TrainStateWithBatchNorm.create(
@@ -275,6 +308,7 @@ def create_train_state(
             dynamic_scale=dynamic_scale,
             ema_tx=ema_tx,
             ema_state=ema_state,
+            ema_batch_stats=ema_batch_stats,
         )
         with_batchnorm = True
     else:
@@ -379,7 +413,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     )
     p_eval_step = jax.pmap(
         functools.partial(
-            eval_step, num_classes=num_classes, with_batchnorm=with_batchnorm
+            eval_step,
+            num_classes=num_classes,
+            with_batchnorm=with_batchnorm,
+            label_smoothing=config.label_smoothing,
         ),
         axis_name="batch",
     )
@@ -388,6 +425,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             eval_step,
             num_classes=num_classes,
             with_batchnorm=with_batchnorm,
+            label_smoothing=config.label_smoothing,
             model_ema=True,
         ),
         axis_name="batch",
@@ -461,7 +499,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             )
             writer.flush()
 
-            if config.model_ema:
+            if state.ema_tx is not None:
                 eval_ema_metrics = []
                 for _ in range(steps_per_eval):
                     eval_batch = next(eval_iter)

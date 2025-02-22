@@ -144,12 +144,6 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
             tx,
         )
 
-    if config.model_ema and config.model_ema_decay > 0.0:
-        logging.info(
-            "Decay rate for the exponential moving average: %f",
-            config.model_ema_decay,
-        )
-
     if config.gradient_accumulation_steps > 1:
         logging.info(
             "Gradient accumulation steps: %d",
