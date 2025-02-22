@@ -58,7 +58,7 @@ class MobileNetV3Backbone(nn.Module):
         x = self.norm()(x)
         x = self.h_swish(x)
 
-        for block_id, layer in self.layers.items():
+        for layer in self.layers.values():
             x = inverted_res_block(
                 expansion=layer["exp"],
                 filters=layer["filters"],
@@ -66,7 +66,6 @@ class MobileNetV3Backbone(nn.Module):
                 strides=layer["strides"],
                 se_ratio=layer["se_ratio"],
                 act=self.h_swish if layer["h_swish"] else self.relu,
-                block_id=int(block_id),
             )(x)
 
         if self.alpha > 1.0:
@@ -95,7 +94,7 @@ class MobileNetV3(nn.Module):
     @nn.compact
     def __call__(self, x, train: bool = True):
         kernel_initializer = jax.nn.initializers.variance_scaling(
-            scale=1.0, mode="fan_in", distribution="truncated_normal"
+            scale=1.0, mode="fan_in", distribution="truncated_normal", dtype=self.dtype
         )
         conv = partial(
             nn.Conv, use_bias=False, kernel_init=kernel_initializer, dtype=self.dtype
@@ -118,10 +117,10 @@ class MobileNetV3(nn.Module):
 
         x = backbone()(x)
 
-        x = jnp.mean(x, axis=(1, 2), keepdims=True)
+        x = jnp.mean(x, axis=(1, 2), keepdims=True, dtype=self.dtype)
 
         x = conv(self.last_block_filters, kernel_size=(1, 1), use_bias=True)(x)
-        x = jnn.hard_swish(x)
+        x = nn.hard_swish(x)
 
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
