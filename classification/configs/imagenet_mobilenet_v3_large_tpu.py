@@ -41,6 +41,11 @@ def get_config():
 
     config.batch_size = 4096
 
+    config.model_ema = True
+    config.model_ema_decay = 0.9999
+    config.model_ema_type = "v2"
+    config.model_ema_trainable_weights_only = False
+
     config.num_epochs = 700
 
     config.use_sync_batch_norm = False
