@@ -30,6 +30,7 @@ from optimizer import create_learning_rate_fn, create_optimizer
 from utils import get_input_dtype
 from loss import cross_entropy_loss
 from checkpoint import create_checkpoint_manager, restore_checkpoint
+from model_ema import ema_v2
 
 """ Eval Image classfication model.
 
@@ -57,11 +58,16 @@ def compute_metrics(logits, labels, num_classes):
 def eval_step(state, batch, num_classes, with_batchnorm, model_ema=False):
     if model_ema:
         params = state.ema_state.ema
+        if state.ema_batch_stats is not None:
+            batch_stats = state.ema_batch_stats.ema
+        else:
+            batch_stats = state.batch_stats
     else:
         params = state.params
+        batch_stats = state.batch_stats
 
     if with_batchnorm:
-        variables = {"params": params, "batch_stats": state.batch_stats}
+        variables = {"params": params, "batch_stats": batch_stats}
         logits = state.apply_fn(variables, batch["image"], train=False, mutable=False)
     else:
         variables = {"params": params}
@@ -89,9 +95,19 @@ def create_eval_state(
 
     ema_tx = None
     ema_state = None
+    ema_batch_stats = None
     if config.model_ema:
-        ema_tx = optax.ema(config.model_ema_decay)
+        if config.model_ema_type == "v1":
+            ema_tx = optax.ema(config.model_ema_decay)
+        elif config.model_ema_type == "v2":
+            ema_tx = ema_v2(config.model_ema_decay)
+        else:
+            logging.error("model_ema_type is incorrect")
+
         ema_state = ema_tx.init(params)
+
+        if not config.model_ema_trainable_weights_only:
+            ema_batch_stats = ema_tx.init(batch_stats)
 
     if batch_stats is not None:
         state = TrainStateWithBatchNorm.create(
@@ -102,6 +118,7 @@ def create_eval_state(
             dynamic_scale=dynamic_scale,
             ema_tx=ema_tx,
             ema_state=ema_state,
+            ema_batch_stats=ema_batch_stats,
         )
         with_batchnorm = True
     else:
@@ -199,15 +216,17 @@ def evaluate(config: ml_collections.ConfigDict, workdir: str):
         if config.get("log_every_steps"):
             if (step + 1) % config.log_every_steps == 0:
                 inference_time = (
-                    time.time() - eval_metrics_last_t
-                ) / config.log_every_steps
+                    (time.time() - eval_metrics_last_t) / config.log_every_steps * 1000
+                )
+
                 logging.info(
                     "eval %d / %d, inference time = %.2f ms per %d batch",
                     (step + 1),
                     steps_per_eval,
-                    inference_time * 1000,
+                    inference_time,
                     local_batch_size,
                 )
+                eval_metrics_last_t = time.time()
 
     eval_metrics = common_utils.get_metrics(eval_metrics)
     summary = jax.tree_util.tree_map(lambda x: x.mean(), eval_metrics)
