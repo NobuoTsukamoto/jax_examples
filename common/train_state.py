@@ -21,6 +21,7 @@ class TrainStateWithBatchNorm(train_state.TrainState):
     dynamic_scale: dynamic_scale_lib.DynamicScale
     ema_tx: optax.GradientTransformation = struct.field(pytree_node=False)
     ema_state: optax.OptState = None
+    ema_batch_stats: optax.OptState = None
 
 
 class TrainStateWithoutBatchNorm(train_state.TrainState):

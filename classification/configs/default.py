@@ -37,6 +37,7 @@ def get_config():
     config.l2_weight_decay = 0.0001
     config.transition_steps = 0
     config.lr_drop_staircase = False
+    config.adam_epsilon = 1e-8
 
     config.num_epochs = 100.0
     config.log_every_steps = 100
@@ -48,7 +49,9 @@ def get_config():
     config.half_precision = False
 
     config.model_ema = False
+    config.model_ema_type = "v1" # v1, v2
     config.model_ema_decay = 0.0
+    config.model_ema_trainable_weights_only = True
 
     config.gradient_accumulation_steps = 1
 
@@ -102,6 +105,8 @@ def get_config():
     config.max_to_keep_checkpoint = 5
 
     config.profile = True
+
+    config.use_sync_batch_norm = True
 
     # If num_train_steps==-1 then the number of training steps is calculated from
     # num_epochs using the entire dataset. Similarly for steps_per_eval.

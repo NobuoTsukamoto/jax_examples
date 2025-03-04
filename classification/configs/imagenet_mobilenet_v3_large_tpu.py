@@ -22,6 +22,7 @@ def get_config():
 
     # optimizer config
     config.optimizer = "adamw"
+    config.adam_epsilon = 1e-7
     config.weight_decay = 0.1
     config.l2_weight_decay = 0.0
 
@@ -38,10 +39,15 @@ def get_config():
     config.cache = True
     config.half_precision = True
 
-    config.batch_size = 1024
-    config.gradient_accumulation_steps = 4
-    config.label_smoothing = 0.1
+    config.batch_size = 4096
+
+    config.model_ema = True
+    config.model_ema_decay = 0.9999
+    config.model_ema_type = "v2"
+    config.model_ema_trainable_weights_only = False
 
     config.num_epochs = 700
+
+    config.use_sync_batch_norm = False
 
     return config

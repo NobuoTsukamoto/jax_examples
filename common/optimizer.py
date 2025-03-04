@@ -70,6 +70,12 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
     return schedule_fn
 
 
+def adamw_decay_mask_fn(params):
+    flat_params = traverse_util.flatten_dict(params)
+    flat_mask = {path: ("BatchNorm" not in path[-2]) for path in flat_params}
+    return traverse_util.unflatten_dict(flat_mask)
+
+
 def decay_mask_fn(params):
     flat_params = traverse_util.flatten_dict(params)
     flat_mask = {
@@ -91,11 +97,14 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
     logging.info("Optimizer: %s", config.optimizer)
 
     if config.optimizer == "adamw":
-        logging.info("weight decay rate: %f", config.weight_decay)
+        logging.info(
+            "weight decay rate: %f, esp: %f", config.weight_decay, config.adam_epsilon
+        )
         tx = optax.adamw(
             learning_rate=learning_rate_fn,
             weight_decay=config.weight_decay,
             mask=decay_mask_fn,
+            eps=config.adam_epsilon,
         )
 
     elif config.optimizer == "rmsprop":
@@ -133,12 +142,6 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
                 mask=decay_mask_fn,
             ),
             tx,
-        )
-
-    if config.model_ema and config.model_ema_decay > 0.0:
-        logging.info(
-            "Decay rate for the exponential moving average: %f",
-            config.model_ema_decay,
         )
 
     if config.gradient_accumulation_steps > 1:

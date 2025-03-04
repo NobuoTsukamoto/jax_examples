@@ -295,8 +295,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
     se_ratio: float
     conv: ModuleDef
     norm: ModuleDef
-    block_id: int
-    act: Callable = None
+    act: Callable
     dtype: Any = jnp.float32
 
     @nn.compact
@@ -304,14 +303,14 @@ class InvertedResBlockMobileNetV3(nn.Module):
         inputs = x
         in_filters = x.shape[-1]
 
-        se_bolock = partial(
+        se_block = partial(
             SeBlock,
             conv=partial(nn.Conv, use_bias=True, dtype=self.dtype),
             act1=nn.relu,
             act2=nn.hard_sigmoid
         )
 
-        if self.block_id != 1:
+        if self.expansion > 1.0:
             # Expand
             x = self.conv(
                 features=_make_divisible(in_filters * self.expansion),
@@ -329,7 +328,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
             features=dw_filters,
             kernel_size=self.kernel_size,
             strides=self.strides,
-            padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
+            padding="SAME",
             feature_group_count=dw_filters,
             name="DepthWise_Conv",
         )(x)
@@ -337,7 +336,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
         x = self.act(x)
 
         if self.se_ratio:
-            x = se_bolock(
+            x = se_block(
                 in_filters=_make_divisible(in_filters * self.expansion),
                 out_filters=dw_filters,
                 se_ratio=self.se_ratio,
@@ -378,12 +377,12 @@ class InvertedResBlockEfficientNet(nn.Module):
         inputs = x
         in_filters = x.shape[-1]
 
-        se_bolock = partial(
+        se_block = partial(
             SeBlock, conv=self.conv, act1=self.act, act2=jnn.sigmoid, divisor=2
         )
         features = int(in_filters * self.expansion)
 
-        if self.expansion != 1:
+        if self.expansion > 1.0:
             # Expand
             x = self.conv(
                 features=features,
@@ -410,7 +409,7 @@ class InvertedResBlockEfficientNet(nn.Module):
 
         # Squeeze and Excitation
         if self.se_ratio:
-            x = se_bolock(
+            x = se_block(
                 in_filters=in_filters,
                 out_filters=dw_filters,
                 se_ratio=self.se_ratio,
@@ -483,12 +482,13 @@ class SeBlock(nn.Module):
 
     in_filters: int
     out_filters: int
-    se_ratio: int
+    se_ratio: float
     conv: ModuleDef
     act1: Callable = nn.relu
     act2: Callable = nn.hard_sigmoid
     use_bias: bool = True
     divisor: int = 8
+    dtype: Any = jnp.float32
 
     @nn.compact
     def __call__(self, x):
@@ -497,14 +497,14 @@ class SeBlock(nn.Module):
             self.in_filters * self.se_ratio, divisor=self.divisor
         )
 
-        x = jnp.mean(x, axis=(1, 2), keepdims=True)
+        x = jnp.mean(x, axis=(1, 2), keepdims=True, dtype=self.dtype)
         x = self.conv(
-            se_filters, kernel_size=(1, 1), padding="same", use_bias=self.use_bias
+            se_filters, kernel_size=(1, 1), padding="SAME", use_bias=self.use_bias
         )(x)
         x = self.act1(x)
 
         x = self.conv(
-            self.out_filters, kernel_size=(1, 1), padding="same", use_bias=self.use_bias
+            self.out_filters, kernel_size=(1, 1), padding="SAME", use_bias=self.use_bias
         )(x)
         x = self.act2(x)
 
