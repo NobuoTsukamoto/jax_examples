@@ -50,8 +50,11 @@ def get_config():
     config.label_smoothing = 0.1
     config.l2_weight_decay = 1e-5
 
-    config.model_ema_decay = 0.9999
     config.model_ema = True
+    config.model_ema_decay = 0.9999
+    config.model_ema_type = "v2"
+    config.model_ema_trainable_weights_only = False
+
     config.init_stochastic_depth_rate = 0.2
 
     config.num_epochs = 500
