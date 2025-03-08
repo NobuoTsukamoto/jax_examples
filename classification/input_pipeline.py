@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2024 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 import jax
@@ -23,9 +23,6 @@ from absl import logging
 """
 
 IMAGE_SIZE = 224
-CROP_PADDING = 32
-MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
-STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
 
 
 def preprocess_for_train(
@@ -234,7 +231,7 @@ def create_split(
         logging.info("Mixup and Cutmix: %s", config.mixup_and_cutmix)
         if config.mixup_and_cutmix:
             logging.info(
-                "mixup_alpha: %f, cutmix_alpha: %f, prob: %f, switch_prob: %f, ",
+                "mixup_alpha: %f, cutmix_alpha: %f, prob: %f, switch_prob: %f, "
                 "label_smoothing: %f, num_classes: %d",
                 config.mixup_and_cutmix_mixup_alpha,
                 config.mixup_and_cutmix_cutmix_alpha,
