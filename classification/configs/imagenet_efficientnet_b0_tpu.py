@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2025 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from configs import default as default_lib
@@ -36,12 +36,6 @@ def get_config():
     config.transition_steps = 751  # 2.4 * steps_per_epoch (313)
     config.lr_drop_staircase = True
 
-    # Auto augment
-    config.aug_type = "autoaug"
-    config.autoaug_augmentation_name = "v0"
-    config.autoaug_cutout_const = 100
-    config.autoaug_translate_const = 250
-
     config.cache = True
     config.half_precision = True
     config.batch_size = 4096
@@ -57,6 +51,8 @@ def get_config():
 
     config.init_stochastic_depth_rate = 0.2
 
-    config.num_epochs = 500
+    config.use_sync_batch_norm = False
+
+    config.num_epochs = 350
 
     return config
