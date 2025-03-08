@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2023 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from functools import partial
@@ -307,7 +307,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
             SeBlock,
             conv=partial(nn.Conv, use_bias=True, dtype=self.dtype),
             act1=nn.relu,
-            act2=nn.hard_sigmoid
+            act2=nn.hard_sigmoid,
         )
 
         if self.expansion > 1.0:
@@ -400,7 +400,7 @@ class InvertedResBlockEfficientNet(nn.Module):
             features=dw_filters,
             kernel_size=self.kernel_size,
             strides=self.strides,
-            padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
+            padding="SAME",
             feature_group_count=dw_filters,
             name="DepthWise_Conv",
         )(x)
