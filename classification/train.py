@@ -98,17 +98,13 @@ def train_step(
     learning_rate_fn,
     num_classes,
     label_smoothing=0.0,
-    dropout_rng=None,
-    stochastic_depth_rng=None,
+    rng=None,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
 ):
     """Perform a single training step."""
 
-    dropout_rng, new_dropout_rng = jax.random.split(dropout_rng)
-    stochastic_depth_rng, new_stochastic_depth_rng = jax.random.split(
-        stochastic_depth_rng
-    )
+    dropout_rng, stochastic_depth_rng, next_rng = jax.random.split(rng, 3)
 
     def loss_fn(params):
         """loss function used for training."""
@@ -185,13 +181,13 @@ def train_step(
         )
         new_state = new_state.replace(ema_state=new_ema_state)
 
-        if new_state.ema_batch_stats is not None:
+        if with_batchnorm and new_state.ema_batch_stats is not None:
             _, new_ema_batch_stats = new_state.ema_tx.update(
                 new_state.batch_stats, new_state.ema_batch_stats
             )
 
             new_state = new_state.replace(ema_batch_stats=new_ema_batch_stats)
-    return new_state, metrics, new_dropout_rng, new_stochastic_depth_rng
+    return new_state, metrics, next_rng
 
 
 def eval_step(
@@ -337,8 +333,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         logdir=workdir, just_logging=jax.process_index() != 0
     )
 
-    rng = jax.random.PRNGKey(seed=config.seed)
-    params_rng, dropout_rng, stochastic_depth_rng = jax.random.split(rng, num=3)
+    rng = jax.random.key(seed=config.seed)
+    params_rng, dropout_rng, stochastic_depth_rng, train_rng = jax.random.split(
+        rng, num=4
+    )
     rngs = {
         "params": params_rng,
         "dropout": dropout_rng,
@@ -430,10 +428,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         ),
         axis_name="batch",
     )
-    dropout_rngs = jax.random.split(dropout_rng, jax.local_device_count())
-    stochastic_depth_rngs = jax.random.split(
-        stochastic_depth_rng, jax.local_device_count()
-    )
+    train_rng = jax.random.split(train_rng, jax.local_device_count())
     train_metrics = []
     hooks = []
     if jax.process_index() == 0 and config.profile:
@@ -446,11 +441,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     logging.info("Initial compilation, this might take some minutes...")
 
     for step, batch in zip(range(step_offset, num_steps), train_iter):
-        state, metrics, dropout_rngs, stochastic_depth_rngs = p_train_step(
+        state, metrics, train_rng = p_train_step(
             state,
             batch,
-            dropout_rng=dropout_rngs,
-            stochastic_depth_rng=stochastic_depth_rngs,
+            rng=train_rng,
         )
         for h in hooks:
             h(step)
@@ -527,6 +521,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             save_checkpoint(checkpoint_manager, state)
 
     # Wait until computations are done before exiting
-    jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
+    jax.random.normal(jax.random.key(seed=config.seed), ()).block_until_ready()
 
     return state
