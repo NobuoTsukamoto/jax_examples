@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2024 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 import ml_collections
@@ -91,6 +91,12 @@ def decay_mask_fn(params):
     return traverse_util.unflatten_dict(flat_mask)
 
 
+def efficientnet_decay_mask_fn(params):
+    flat_params = traverse_util.flatten_dict(params)
+    flat_mask = {path: ("BatchNorm" not in path[-2]) for path in flat_params}
+    return traverse_util.unflatten_dict(flat_mask)
+
+
 def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
     """Create optimizer."""
 
@@ -139,7 +145,7 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
         tx = optax.chain(
             optax.add_decayed_weights(
                 weight_decay=config.l2_weight_decay * 0.5,
-                mask=decay_mask_fn,
+                mask=efficientnet_decay_mask_fn,
             ),
             tx,
         )
