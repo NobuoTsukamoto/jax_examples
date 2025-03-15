@@ -297,6 +297,8 @@ class InvertedResBlockMobileNetV3(nn.Module):
     norm: ModuleDef
     act: Callable
     dtype: Any = jnp.float32
+    stochastic_depth: Optional[ModuleDef] = None
+    stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, x):
@@ -353,6 +355,10 @@ class InvertedResBlockMobileNetV3(nn.Module):
         x = self.norm()(x)
 
         if in_filters == self.filters and self.strides == (1, 1):
+            if self.stochastic_depth and self.stochastic_depth_drop_rate > 0.0:
+                x = self.stochastic_depth(
+                    stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                )(x)
             x = x + inputs
 
         return x
@@ -368,8 +374,8 @@ class InvertedResBlockEfficientNet(nn.Module):
     se_ratio: float
     conv: ModuleDef
     norm: ModuleDef
-    stochastic_depth: ModuleDef = None
     act: Callable = None
+    stochastic_depth: Optional[ModuleDef] = None
     stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
@@ -426,7 +432,7 @@ class InvertedResBlockEfficientNet(nn.Module):
         x = self.norm()(x)
 
         if in_filters == self.out_filters and self.strides == (1, 1):
-            if self.stochastic_depth_drop_rate > 0.0:
+            if self.stochastic_depth and self.stochastic_depth_drop_rate > 0.0:
                 x = self.stochastic_depth(
                     stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
                 )(x)
