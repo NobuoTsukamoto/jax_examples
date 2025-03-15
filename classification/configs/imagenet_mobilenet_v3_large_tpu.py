@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from configs import default as default_lib
@@ -20,33 +20,32 @@ def get_config():
     # dataset
     config.dataset = "imagenet2012:5.*.*"
 
-    # optimizer config
-    config.optimizer = "adamw"
-    config.adam_epsilon = 1e-7
-    config.weight_decay = 0.1
-    config.l2_weight_decay = 0.0
+    # randomarug
+    config.aug_type = "randaug"
+    config.randaug_num_layers = 2
+    config.randaug_magnitude = 15
+    config.randaug_cutout_const = 20
+    config.randaug_translate_const = 10
+    config.randaug_magnitude_std = 0.0
+    config.randaug_prob_to_apply = 0.7
+    config.randaug_exclude_ops = ["Cutout"]
 
-    # Auto augment
-    config.aug_type = "autoaug"
-    config.autoaug_augmentation_name = "v0"
-    config.autoaug_cutout_const = 100
-    config.autoaug_translate_const = 250
+    # optimizer
+    config.optimizer = "adamw"
+    config.weight_decay = 0.01
+    config.adam_epsilon = 1e-7
 
     # LR scheduler config
-    config.optimizer_schedule = "cosine"
+    config.optimizer_schedule = "warmup_cosine_decay"
     config.learning_rate = 0.004
+    config.warmup_epochs = 5
 
     config.cache = True
     config.half_precision = True
 
     config.batch_size = 4096
 
-    config.model_ema = True
-    config.model_ema_decay = 0.9999
-    config.model_ema_type = "v2"
-    config.model_ema_trainable_weights_only = False
-
-    config.num_epochs = 700
+    config.num_epochs = 500
 
     config.use_sync_batch_norm = False
 
