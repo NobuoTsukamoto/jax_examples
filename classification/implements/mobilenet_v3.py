@@ -105,7 +105,9 @@ class MobileNetV3(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        kernel_initializer = nn.initializers.uniform(scale=0.05)
+        kernel_initializer = nn.initializers.variance_scaling(
+            scale=1.0, mode="fan_in", distribution="truncated_normal", dtype=self.dtype
+        )
         conv = partial(
             nn.Conv, use_bias=False, kernel_init=kernel_initializer, dtype=self.dtype
         )
