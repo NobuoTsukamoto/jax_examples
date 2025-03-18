@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from configs import default as default_lib
@@ -33,9 +33,11 @@ def get_config():
     config.cache = True
     config.half_precision = True
     config.batch_size = 4096
+    config.init_stochastic_depth_rate = 0.1
+
+    config.model_ema = "v2"
     config.model_ema_decay = 0.9999
     config.model_ema = True
-    config.init_stochastic_depth_rate = 0.1
 
     config.num_epochs = 300
 
