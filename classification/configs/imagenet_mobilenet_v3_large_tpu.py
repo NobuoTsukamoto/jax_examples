@@ -20,33 +20,36 @@ def get_config():
     # dataset
     config.dataset = "imagenet2012:5.*.*"
 
-    # randomarug
-    config.aug_type = "randaug"
-    config.randaug_num_layers = 2
-    config.randaug_magnitude = 15
-    config.randaug_cutout_const = 20
-    config.randaug_translate_const = 10
-    config.randaug_magnitude_std = 0.0
-    config.randaug_prob_to_apply = 0.7
-    config.randaug_exclude_ops = ["Cutout"]
-
-    # optimizer
-    config.optimizer = "adamw"
-    config.weight_decay = 0.01
-    config.adam_epsilon = 1e-7
+    # optimizer config
+    config.optimizer = "rmsprop"
+    config.rmsprop_decay = 0.9
+    config.rmsprop_epsilon = 0.002
+    config.momentum = 0.9
+    config.rmsprop_initial_scale = 1.0
 
     # LR scheduler config
-    config.optimizer_schedule = "warmup_cosine_decay"
-    config.learning_rate = 0.004
+    config.optimizer_schedule = "warmup_exponential_decay"
+    config.initial_learning_rate = 0.0
+    config.learning_rate = 0.426  # 0.02 * (batch_size / 192)
     config.warmup_epochs = 5
+    config.exponential_decay_rate = 0.99
+    config.transition_steps = 939  # 3.0 * steps_per_epoch (313)
+    config.lr_drop_staircase = True
 
     config.cache = True
     config.half_precision = True
+    config.batch_size = 4096  # 512 * 8
 
-    config.batch_size = 4096
+    config.label_smoothing = 0.1
+    config.l2_weight_decay = 0.00001
 
-    config.num_epochs = 500
+    config.model_ema = True
+    config.model_ema_decay = 0.9999
+    config.model_ema_type = "v2"
+    config.model_ema_trainable_weights_only = False
 
-    config.use_sync_batch_norm = False
+    config.num_epochs = 1000
+
+    config.use_sync_batch_norm = True
 
     return config
