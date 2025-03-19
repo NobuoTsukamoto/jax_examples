@@ -35,9 +35,9 @@ def get_config():
     config.batch_size = 4096
     config.init_stochastic_depth_rate = 0.1
 
-    config.model_ema = "v2"
-    config.model_ema_decay = 0.9999
     config.model_ema = True
+    config.model_ema_decay = 0.9999
+    config.model_ema_type = "v2"
 
     config.num_epochs = 300
 
