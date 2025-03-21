@@ -21,35 +21,29 @@ def get_config():
     config.dataset = "imagenet2012:5.*.*"
 
     # optimizer config
-    config.optimizer = "rmsprop"
-    config.rmsprop_decay = 0.9
-    config.rmsprop_epsilon = 0.002
-    config.momentum = 0.9
-    config.rmsprop_initial_scale = 1.0
+    config.optimizer = "adamw"
+    config.adam_epsilon = 1e-7
+    config.weight_decay = 0.1
+    config.l2_weight_decay = 0.0
+
+    # Auto augment
+    config.aug_type = "autoaug"
+    config.autoaug_augmentation_name = "v0"
+    config.autoaug_cutout_const = 100
+    config.autoaug_translate_const = 250
 
     # LR scheduler config
-    config.optimizer_schedule = "warmup_exponential_decay"
-    config.initial_learning_rate = 0.0
-    config.learning_rate = 0.426  # 0.02 * (batch_size / 192)
-    config.warmup_epochs = 5
-    config.exponential_decay_rate = 0.99
-    config.transition_steps = 939  # 3.0 * steps_per_epoch (313)
-    config.lr_drop_staircase = True
+    config.optimizer_schedule = "cosine"
+    config.learning_rate = 0.004
 
     config.cache = True
     config.half_precision = True
-    config.batch_size = 4096  # 512 * 8
 
-    config.label_smoothing = 0.1
-    config.l2_weight_decay = 0.00001
+    config.batch_size = 1024
+    config.gradient_accumulation_steps = 4
 
-    config.model_ema = True
-    config.model_ema_decay = 0.9999
-    config.model_ema_type = "v2"
-    config.model_ema_trainable_weights_only = False
+    config.num_epochs = 700
 
-    config.num_epochs = 1000
-
-    config.use_sync_batch_norm = True
+    config.use_sync_batch_norm = False
 
     return config
