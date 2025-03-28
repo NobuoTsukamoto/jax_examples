@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2024 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 import ml_collections
@@ -38,6 +38,7 @@ def get_config():
     config.transition_steps = 0
     config.lr_drop_staircase = False
     config.adam_epsilon = 1e-8
+    config.weight_decay_exclude_layers = None
 
     config.num_epochs = 100.0
     config.log_every_steps = 100
@@ -49,7 +50,7 @@ def get_config():
     config.half_precision = False
 
     config.model_ema = False
-    config.model_ema_type = "v1" # v1, v2
+    config.model_ema_type = "v1"  # v1, v2
     config.model_ema_decay = 0.0
     config.model_ema_trainable_weights_only = True
 
@@ -97,6 +98,8 @@ def get_config():
     config.center_crop_fraction = 0.875
 
     config.three_augment = False
+
+    config.normalize = True
 
     config.init_stochastic_depth_rate = 0.0
 

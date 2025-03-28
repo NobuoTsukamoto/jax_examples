@@ -20,6 +20,9 @@ def get_config():
     # dataset
     config.dataset = "imagenet2012:5.*.*"
 
+    # preprocessing
+    config.normalize = False
+
     # optimizer config
     config.optimizer = "rmsprop"
     config.rmsprop_decay = 0.9
@@ -43,7 +46,11 @@ def get_config():
 
     config.label_smoothing = 0.1
     config.l2_weight_decay = 1e-5
+    config.weight_decay_exclude_layers = [
+        "BatchNorm",
+    ]
 
+    # model ema
     config.model_ema = True
     config.model_ema_decay = 0.9999
     config.model_ema_type = "v2"
