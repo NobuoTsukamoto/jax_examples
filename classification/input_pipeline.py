@@ -23,6 +23,7 @@ from absl import logging
 """
 
 IMAGE_SIZE = 224
+CROP_FRACTION = 0.875
 
 
 def preprocess_for_train(
@@ -87,11 +88,12 @@ def preprocess_for_train(
         ).distort(image)
 
     # Normalizes image with mean and std pixel values.
-    image = tfm.vision.preprocess_ops.normalize_image(
-        image,
-        offset=tfm.vision.preprocess_ops.MEAN_RGB,
-        scale=tfm.vision.preprocess_ops.STDDEV_RGB,
-    )
+    if config.normalize:
+        image = tfm.vision.preprocess_ops.normalize_image(
+            image,
+            offset=tfm.vision.preprocess_ops.MEAN_RGB,
+            scale=tfm.vision.preprocess_ops.STDDEV_RGB,
+        )
 
     # Random erasing after the image has been normalized
     if random_erasing is not None:
@@ -128,10 +130,98 @@ def preprocess_for_eval(
     image.set_shape([config.image_size, config.image_size, 3])
 
     # Normalizes image with mean and std pixel values.
-    image = tfm.vision.preprocess_ops.normalize_image(
+    if config.normalize:
+        image = tfm.vision.preprocess_ops.normalize_image(
+            image,
+            offset=tfm.vision.preprocess_ops.MEAN_RGB,
+            scale=tfm.vision.preprocess_ops.STDDEV_RGB,
+        )
+
+    image = tf.image.convert_image_dtype(image, dtype=dtype)
+    return image
+
+
+def preprocess_for_train_efficientnet(
+    image_bytes,
+    config: ml_collections.ConfigDict,
+    augmenter=None,
+    dtype=tf.float32,
+):
+    """EfficientNet-style preprocessing for training.
+
+    Args:
+        image_bytes: tf.Tensor, image in bytes (JPEG).
+        config: ml_collections.ConfigDict containing 'image_size'.
+        dtype: final dtype (e.g. tf.float32 or tf.bfloat16)
+
+    Returns:
+        Preprocessed image tensor.
+    """
+    # Decode and random crop (Inception-style)
+    shape = tf.image.extract_jpeg_shape(image_bytes)
+    image_height = shape[0]
+    image_width = shape[1]
+
+    crop_padding = round(IMAGE_SIZE * (1 / CROP_FRACTION - 1))
+    padded_center_crop_size = tf.cast(
+        (
+            (IMAGE_SIZE / (IMAGE_SIZE + crop_padding))
+            * tf.cast(tf.minimum(image_height, image_width), tf.float32)
+        ),
+        tf.int32,
+    )
+    offset_height = ((image_height - padded_center_crop_size) + 1) // 2
+    offset_width = ((image_width - padded_center_crop_size) + 1) // 2
+    crop_window = tf.stack(
+        [offset_height, offset_width, padded_center_crop_size, padded_center_crop_size]
+    )
+    image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+
+    # Random horizontal flip
+    image = tf.image.random_flip_left_right(image)
+
+    # Apply autoaug or randaug.
+    if augmenter is not None:
+        image = augmenter.distort(image)
+
+    # Resize to final size
+    image = tf.image.resize(
         image,
-        offset=tfm.vision.preprocess_ops.MEAN_RGB,
-        scale=tfm.vision.preprocess_ops.STDDEV_RGB,
+        [config.image_size, config.image_size],
+        method=tf.image.ResizeMethod.BICUBIC,
+    )
+
+    # Convert to [0.0, 1.0]
+    image = tf.image.convert_image_dtype(image, dtype)
+
+    return image
+
+
+def preprocess_for_eval_efficientnet(
+    image_bytes, config: ml_collections.ConfigDict, dtype=tf.float32
+):
+    shape = tf.image.extract_jpeg_shape(image_bytes)
+    image_height = shape[0]
+    image_width = shape[1]
+
+    crop_padding = round(IMAGE_SIZE * (1 / CROP_FRACTION - 1))
+    padded_center_crop_size = tf.cast(
+        (
+            (IMAGE_SIZE / (IMAGE_SIZE + crop_padding))
+            * tf.cast(tf.minimum(image_height, image_width), tf.float32)
+        ),
+        tf.int32,
+    )
+    offset_height = ((image_height - padded_center_crop_size) + 1) // 2
+    offset_width = ((image_width - padded_center_crop_size) + 1) // 2
+    crop_window = tf.stack(
+        [offset_height, offset_width, padded_center_crop_size, padded_center_crop_size]
+    )
+    image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+    image = tf.image.resize(
+        image,
+        [config.image_size, config.image_size],
+        method=tf.image.ResizeMethod.BICUBIC,
     )
 
     image = tf.image.convert_image_dtype(image, dtype=dtype)
