@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 import functools
 import time
@@ -454,6 +454,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         if step == step_offset:
             logging.info("Initial compilation completed.")
 
+        if (
+            with_batchnorm
+            and config.use_sync_batch_norm
+            and (step + 1) % config.gradient_accumulation_steps == 0
+        ):
+            # Sync batch statistics across replicas after gradient accumulation.
+            # This ensures that all devices use consistent BatchNorm statistics,
+            # especially when per-device batch sizes are small.
+            # Note: This is only done if sync BN is explicitly enabled.
+            state = sync_batch_stats(state)
+
         if config.get("log_every_steps"):
             train_metrics.append(metrics)
             if (step + 1) % config.log_every_steps == 0:
@@ -475,8 +486,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             epoch = step // steps_per_epoch
             eval_metrics = []
 
-            if with_batchnorm and config.use_sync_batch_norm:
-                # sync batch statistics across replicas
+            if with_batchnorm and not config.use_sync_batch_norm:
+                # Sync batch statistics across replicas before evaluation or
+                # checkpointing.
+                # Even if SyncBN is disabled during training,
+                #  (i.e., BN is local to each device)
+                # we still need to synchronize the statistics once to ensure consistent
+                # results during evaluation or inference.
                 state = sync_batch_stats(state)
 
             for _ in range(steps_per_eval):
@@ -519,7 +535,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                 writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            if with_batchnorm and config.use_sync_batch_norm:
+            if with_batchnorm and not config.use_sync_batch_norm:
+                # Final synchronization of batch statistics before checkpointing.
+                # If SyncBN was not used during training, batch_stats may differ across
+                # devices.
+                # We synchronize here to ensure the saved model has consistent stats
+                # for evaluation and inference.
                 state = sync_batch_stats(state)
             save_checkpoint(checkpoint_manager, state)
 
