@@ -290,6 +290,9 @@ def create_train_state(
         else:
             logging.error("model_ema_type is incorrect")
 
+        if config.gradient_accumulation_steps > 1:
+            ema_tx = optax.MultiSteps(ema_tx, config.gradient_accumulation_steps)
+
         ema_state = ema_tx.init(params)
 
         if not config.model_ema_trainable_weights_only:
