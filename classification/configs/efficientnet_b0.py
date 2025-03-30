@@ -18,7 +18,7 @@ def get_config():
     config.model = "EfficientNet_B0"
 
     # preprocessing
-    config.normalize = False
+    config.input_pipeline_type = "efficientnet"
 
     # optimizer config
     config.optimizer = "rmsprop"

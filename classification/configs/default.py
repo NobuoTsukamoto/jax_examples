@@ -57,6 +57,7 @@ def get_config():
     config.gradient_accumulation_steps = 1
 
     # Input and augmentation
+    config.input_pipeline_type = "default"
     config.aug_rand_horizontal_flip = True
     config.aug_type = "none"  # randaug, autoaug, none
 

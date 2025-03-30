@@ -12,6 +12,8 @@ from typing import Dict
 import math
 
 import input_pipeline
+import input_pipeline_for_efficientnet
+
 import jax
 import jax.numpy as jnp
 import ml_collections
@@ -231,13 +233,23 @@ def prepare_tf_data(xs):
 
 
 def create_input_iter(dataset_builder, batch_size, dtype, train, config):
-    ds = input_pipeline.create_split(
-        dataset_builder,
-        batch_size=batch_size,
-        dtype=dtype,
-        train=train,
-        config=config,
-    )
+    if config.input_pipeline_type == "efficientnet":
+        ds = input_pipeline_for_efficientnet.create_split(
+            dataset_builder,
+            batch_size=batch_size,
+            dtype=dtype,
+            train=train,
+            config=config,
+        )
+    else:
+        ds = input_pipeline.create_split(
+            dataset_builder,
+            batch_size=batch_size,
+            dtype=dtype,
+            train=train,
+            config=config,
+        )
+
     it = map(prepare_tf_data, ds)
     it = jax_utils.prefetch_to_device(it, 2)
     return it

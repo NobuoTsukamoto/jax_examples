@@ -21,7 +21,7 @@ def get_config():
     config.dataset = "imagenet2012:5.*.*"
 
     # preprocessing
-    config.normalize = False
+    config.input_pipeline_type = "efficientnet"
 
     # optimizer config
     config.optimizer = "rmsprop"
