@@ -97,12 +97,13 @@ def compute_metrics(logits, labels, num_classes, label_smoothing=0.0):
 def train_step(
     state,
     batch,
+    rng,
     learning_rate_fn,
     num_classes,
     label_smoothing=0.0,
-    rng=None,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
+    use_sync_batch_norm=False,
 ):
     """Perform a single training step."""
 
@@ -155,9 +156,12 @@ def train_step(
     metrics["learning_rate"] = lr
 
     if with_batchnorm:
-        new_state = state.apply_gradients(
-            grads=grads, batch_stats=new_model_state["batch_stats"]
-        )
+        if use_sync_batch_norm:
+            batch_stats = lax.pmean(new_model_state["batch_stats"], "batch")
+        else:
+            batch_stats = new_model_state["batch_stats"]
+
+        new_state = state.apply_gradients(grads=grads, batch_stats=batch_stats)
     else:
         new_state = state.apply_gradients(grads=grads)
 
@@ -411,7 +415,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
-    state = jax_utils.replicate(state)
 
     p_train_step = jax.pmap(
         functools.partial(
@@ -421,7 +424,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
+            use_sync_batch_norm=config.use_sync_batch_norm,
         ),
+        in_axes=(None, 0, 0),
+        out_axes=(None, 0, 0),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
@@ -431,6 +437,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             with_batchnorm=with_batchnorm,
             label_smoothing=config.label_smoothing,
         ),
+        in_axes=(None, 0),
         axis_name="batch",
     )
     p_ema_eval_step = jax.pmap(
@@ -441,6 +448,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             model_ema=True,
         ),
+        in_axes=(None, 0),
         axis_name="batch",
     )
     train_rng = jax.random.split(train_rng, jax.local_device_count())
@@ -459,23 +467,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         state, metrics, train_rng = p_train_step(
             state,
             batch,
-            rng=train_rng,
+            train_rng,
         )
         for h in hooks:
             h(step)
         if step == step_offset:
             logging.info("Initial compilation completed.")
-
-        if (
-            with_batchnorm
-            and config.use_sync_batch_norm
-            and (step + 1) % config.gradient_accumulation_steps == 0
-        ):
-            # Sync batch statistics across replicas after gradient accumulation.
-            # This ensures that all devices use consistent BatchNorm statistics,
-            # especially when per-device batch sizes are small.
-            # Note: This is only done if sync BN is explicitly enabled.
-            state = sync_batch_stats(state)
 
         if config.get("log_every_steps"):
             train_metrics.append(metrics)
