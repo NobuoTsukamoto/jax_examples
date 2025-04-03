@@ -58,7 +58,7 @@ def get_config():
 
     config.init_stochastic_depth_rate = 0.2
 
-    config.use_sync_batch_norm = True
+    config.use_sync_batch_norm = False
 
     config.num_epochs = 350
 
