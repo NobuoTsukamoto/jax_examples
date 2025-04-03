@@ -103,7 +103,6 @@ def train_step(
     label_smoothing=0.0,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
-    use_sync_batch_norm=False,
 ):
     """Perform a single training step."""
 
@@ -156,12 +155,9 @@ def train_step(
     metrics["learning_rate"] = lr
 
     if with_batchnorm:
-        if use_sync_batch_norm:
-            batch_stats = lax.pmean(new_model_state["batch_stats"], "batch")
-        else:
-            batch_stats = new_model_state["batch_stats"]
-
-        new_state = state.apply_gradients(grads=grads, batch_stats=batch_stats)
+        new_state = state.apply_gradients(
+            grads=grads, batch_stats=new_model_state["batch_stats"]
+        )
     else:
         new_state = state.apply_gradients(grads=grads)
 
@@ -415,6 +411,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     state = restore_checkpoint(checkpoint_manager, state)
     # step_offset > 0 if restarting from checkpoint
     step_offset = int(state.step)
+    state = jax_utils.replicate(state)
 
     p_train_step = jax.pmap(
         functools.partial(
@@ -424,10 +421,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
-            use_sync_batch_norm=config.use_sync_batch_norm,
         ),
-        in_axes=(None, 0, 0),
-        out_axes=(None, 0, 0),
         axis_name="batch",
     )
     p_eval_step = jax.pmap(
@@ -437,7 +431,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             with_batchnorm=with_batchnorm,
             label_smoothing=config.label_smoothing,
         ),
-        in_axes=(None, 0),
         axis_name="batch",
     )
     p_ema_eval_step = jax.pmap(
@@ -448,7 +441,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             model_ema=True,
         ),
-        in_axes=(None, 0),
         axis_name="batch",
     )
     train_rng = jax.random.split(train_rng, jax.local_device_count())
