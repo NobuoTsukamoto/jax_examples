@@ -487,13 +487,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             epoch = step // steps_per_epoch
             eval_metrics = []
 
-            if with_batchnorm and not config.use_sync_batch_norm:
+            if with_batchnorm and config.use_sync_batch_norm:
                 # Sync batch statistics across replicas before evaluation or
                 # checkpointing.
-                # Even if SyncBN is disabled during training,
-                #  (i.e., BN is local to each device)
-                # we still need to synchronize the statistics once to ensure consistent
-                # results during evaluation or inference.
                 state = sync_batch_stats(state)
 
             for _ in range(steps_per_eval):
