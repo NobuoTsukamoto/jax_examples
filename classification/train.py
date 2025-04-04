@@ -289,16 +289,23 @@ def create_train_state(
     ema_batch_stats = None
     if config.model_ema:
         logging.info(
-            "Model EMA %s, Decay rate: %f, Trainable weights only: %s",
+            "Model EMA %s, Decay rate: %f, Debias: %s, Trainable weights only: %s",
             config.model_ema_type,
             config.model_ema_decay,
+            config.model_ema_debias,
             config.model_ema_trainable_weights_only,
         )
 
         if config.model_ema_type == "v1":
-            ema_tx = optax.ema(config.model_ema_decay)
+            ema_tx = optax.ema(
+                config.model_ema_decay,
+                debias=config.model_ema_debias
+            )
         elif config.model_ema_type == "v2":
-            ema_tx = ema_v2(config.model_ema_decay)
+            ema_tx = ema_v2(
+                config.model_ema_decay,
+                debias=config.model_ema_debias
+            )
         else:
             logging.error("model_ema_type is incorrect")
 
