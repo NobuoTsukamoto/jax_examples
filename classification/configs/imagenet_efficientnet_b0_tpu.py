@@ -41,7 +41,7 @@ def get_config():
 
     config.cache = True
     config.half_precision = False
-    config.batch_size = 4096
+    config.batch_size = 2048
     config.gradient_accumulation_steps = 2
 
     config.label_smoothing = 0.1
