@@ -178,7 +178,7 @@ def create_split(
     Returns:
         A `tf.data.Dataset`.
     """
-    logging.info("Input pipeline: : %s", config.input_pipeline_type)
+    logging.info("Input pipeline: %s", config.input_pipeline_type)
 
     augmenter = None
     random_erasing = None
