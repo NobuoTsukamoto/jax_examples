@@ -178,7 +178,9 @@ def train_step(
         metrics["scale"] = dynamic_scale.scale
 
     def maybe_update_ema(new_state):
-        _, new_ema_state = new_state.ema_tx.update(new_state.params, new_state.ema_state)
+        _, new_ema_state = new_state.ema_tx.update(
+            new_state.params, new_state.ema_state
+        )
         new_state = new_state.replace(ema_state=new_ema_state)
 
         if with_batchnorm and new_state.ema_batch_stats is not None:
@@ -188,13 +190,12 @@ def train_step(
             new_state = new_state.replace(ema_batch_stats=new_ema_batch_stats)
         return new_state
 
-
-    cond = (state.ema_tx is not None and (state.step % gradient_accumulation_steps) == 0)
+    cond = state.ema_tx is not None and (state.step % gradient_accumulation_steps) == 0
     new_state = jax.lax.cond(
         cond,
-        maybe_update_ema,           # true_fn
-        lambda x: x,                # false_fn (no-op)
-        new_state,                  # operand
+        maybe_update_ema,  # true_fn
+        lambda x: x,  # false_fn (no-op)
+        new_state,  # operand
     )
 
     return new_state, metrics, next_rng
@@ -305,15 +306,9 @@ def create_train_state(
         )
 
         if config.model_ema_type == "v1":
-            ema_tx = optax.ema(
-                config.model_ema_decay,
-                debias=config.model_ema_debias
-            )
+            ema_tx = optax.ema(config.model_ema_decay, debias=config.model_ema_debias)
         elif config.model_ema_type == "v2":
-            ema_tx = ema_v2(
-                config.model_ema_decay,
-                debias=config.model_ema_debias
-            )
+            ema_tx = ema_v2(config.model_ema_decay, debias=config.model_ema_debias)
         else:
             logging.error("model_ema_type is incorrect")
 
