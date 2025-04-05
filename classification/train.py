@@ -544,12 +544,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                 writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            if with_batchnorm and not config.use_sync_batch_norm:
+            if with_batchnorm and config.use_sync_batch_norm:
                 # Final synchronization of batch statistics before checkpointing.
-                # If SyncBN was not used during training, batch_stats may differ across
-                # devices.
-                # We synchronize here to ensure the saved model has consistent stats
-                # for evaluation and inference.
                 state = sync_batch_stats(state)
             save_checkpoint(checkpoint_manager, state)
 

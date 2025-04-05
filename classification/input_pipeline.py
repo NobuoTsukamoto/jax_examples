@@ -177,7 +177,7 @@ def create_split(
 
         if config.aug_type == "autoaug":
             logging.info(
-                "augmentation_name: %s, cutout_const: %d, autoaug_translate_const: %d",
+                "augmentation_name: %s, cutout_const: %s, autoaug_translate_const: %s",
                 config.autoaug_augmentation_name,
                 config.autoaug_cutout_const,
                 config.autoaug_translate_const,
@@ -189,8 +189,8 @@ def create_split(
             )
         elif config.aug_type == "randaug":
             logging.info(
-                "num_layers: %d, magnitude: %f, cutout_const: %f, translate_const: %f, "
-                "magnitude_std: %f, prob_to_apply: %f, exclude_ops :%s",
+                "num_layers: %s, magnitude: %s, cutout_const: %s, translate_const: %s, "
+                "magnitude_std: %s, prob_to_apply: %s, exclude_ops :%s",
                 config.randaug_num_layers,
                 config.randaug_magnitude,
                 config.randaug_cutout_const,
@@ -212,8 +212,8 @@ def create_split(
         logging.info("Random erasing: %s", config.random_erasing)
         if config.random_erasing:
             logging.info(
-                "probability: %f, min_area: %f, max_area: %f, min_aspect: %f, "
-                "max_aspect: %f, min_count: %d, max_count: %d, trials: %d",
+                "probability: %s, min_area: %s, max_area: %s, min_aspect: %s, "
+                "max_aspect: %s, min_count: %s, max_count: %s, trials: %s",
                 config.random_erasing_probability,
                 config.random_erasing_min_area,
                 config.random_erasing_max_area,
@@ -237,8 +237,8 @@ def create_split(
         logging.info("Mixup and Cutmix: %s", config.mixup_and_cutmix)
         if config.mixup_and_cutmix:
             logging.info(
-                "mixup_alpha: %f, cutmix_alpha: %f, prob: %f, switch_prob: %f, "
-                "label_smoothing: %f, num_classes: %d",
+                "mixup_alpha: %s, cutmix_alpha: %s, prob: %s, switch_prob: %s, "
+                "label_smoothing: %s, num_classes: %s",
                 config.mixup_and_cutmix_mixup_alpha,
                 config.mixup_and_cutmix_cutmix_alpha,
                 config.mixup_and_cutmix_prob,
