@@ -38,7 +38,13 @@ def get_config():
     config.transition_steps = 0
     config.lr_drop_staircase = False
     config.adam_epsilon = 1e-8
-    config.weight_decay_exclude_layers = None
+    config.weight_decay_exclude_layers = [
+        "bias",
+        "LayerNorm",
+        "BatchNorm",
+        "DepthWise",
+        "LayerScale",
+    ]
 
     config.num_epochs = 100.0
     config.log_every_steps = 100
