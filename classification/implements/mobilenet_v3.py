@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2024 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from functools import partial
@@ -16,6 +16,7 @@ import jax.nn as jnn
 from flax import linen as nn
 
 from common_layer import _make_divisible, InvertedResBlockMobileNetV3
+from stochastic_depth import StochasticDepth
 
 ModuleDef = Any
 
@@ -40,6 +41,8 @@ class MobileNetV3Backbone(nn.Module):
     h_swish: Callable = nn.hard_swish
     conv: ModuleDef = nn.Conv
     norm: ModuleDef = nn.BatchNorm
+    stochastic_depth: Optional[ModuleDef] = None
+    init_stochastic_depth_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, x):
@@ -58,7 +61,12 @@ class MobileNetV3Backbone(nn.Module):
         x = self.norm()(x)
         x = self.h_swish(x)
 
+        num_stage = 0
+        blocks = float(len(self.layers))
+
         for layer in self.layers.values():
+            drop_rate = self.init_stochastic_depth_rate * float(num_stage) / blocks
+
             x = inverted_res_block(
                 expansion=layer["exp"],
                 filters=layer["filters"],
@@ -66,7 +74,11 @@ class MobileNetV3Backbone(nn.Module):
                 strides=layer["strides"],
                 se_ratio=layer["se_ratio"],
                 act=self.h_swish if layer["h_swish"] else self.relu,
+                stochastic_depth=self.stochastic_depth,
+                stochastic_depth_drop_rate=drop_rate,
             )(x)
+
+            num_stage += 1
 
         if self.alpha > 1.0:
             filters = _make_divisible(x.shape[-1] * 6 * self.alpha, 8)
@@ -106,6 +118,10 @@ class MobileNetV3(nn.Module):
             epsilon=0.001,
             dtype=self.dtype,
         )
+        stochastic_depth = None
+        if self.init_stochastic_depth_rate > 0.0:
+            stochastic_depth = partial(StochasticDepth, deterministic=not train)
+
         backbone = partial(
             MobileNetV3Backbone,
             alpha=self.alpha,
@@ -113,6 +129,8 @@ class MobileNetV3(nn.Module):
             dtype=self.dtype,
             conv=conv,
             norm=norm,
+            stochastic_depth=stochastic_depth,
+            init_stochastic_depth_rate=self.init_stochastic_depth_rate,
         )
 
         x = backbone()(x)

@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2024 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 import math
@@ -12,6 +12,7 @@ import math
 from functools import partial
 from typing import Any, Callable, Dict, Optional
 
+import jax
 import jax.numpy as jnp
 import jax.nn as jnn
 from flax import linen as nn
@@ -137,6 +138,14 @@ class EfficientNetBackbone(nn.Module):
         return x
 
 
+def conv_kernel_initializer(key, shape, dtype=jnp.float32):
+
+    kernel_height, kernel_width, _, out_filters = shape
+    fan_out = kernel_height * kernel_width * out_filters
+    stddev = jnp.sqrt(2.0 / fan_out)
+    return jax.random.normal(key, shape, dtype) * stddev
+
+
 class EfficientNet(nn.Module):
     """EfficientNet."""
 
@@ -150,17 +159,14 @@ class EfficientNet(nn.Module):
 
     @nn.compact
     def __call__(self, x, train: bool = True):
-        kernel_initializer = nn.initializers.variance_scaling(
-            scale=2.0, mode="fan_out", distribution="truncated_normal"
-        )
         dense_initializer = nn.initializers.variance_scaling(
-            scale=1.0 / 3.0, mode="fan_out", distribution="truncated_normal"
+            scale=1.0 / 3.0, mode="fan_out", distribution="uniform"
         )
 
         conv = partial(
             nn.Conv,
             use_bias=self.use_bias,
-            kernel_init=kernel_initializer,
+            kernel_init=conv_kernel_initializer,
             dtype=self.dtype,
         )
         norm = partial(

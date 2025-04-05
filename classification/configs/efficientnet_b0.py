@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2025 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from configs import default as default_lib
@@ -16,6 +16,9 @@ def get_config():
 
     # As defined in the `models` module.
     config.model = "EfficientNet_B0"
+
+    # preprocessing
+    config.input_pipeline_type = "efficientnet"
 
     # optimizer config
     config.optimizer = "rmsprop"
@@ -45,10 +48,18 @@ def get_config():
 
     config.label_smoothing = 0.1
     config.l2_weight_decay = 1e-5
+    config.weight_decay_exclude_layers = [
+        "BatchNorm",
+    ]
 
-    config.model_ema_decay = 0.9999
+    # model ema
     config.model_ema = True
-    config.init_stochastic_depth_rate = 0.2
+    config.model_ema_decay = 0.9999
+    config.model_ema_type = "v2"
+    config.model_ema_debias = False
+    config.model_ema_trainable_weights_only = False
+
+    config.use_sync_batch_norm = False
 
     config.num_epochs = 350
 

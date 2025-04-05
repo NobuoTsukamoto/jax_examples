@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2024 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from absl.testing import absltest
@@ -33,6 +33,7 @@ class MobileNetV3Test(parameterized.TestCase):
             layers=Large,
             last_block_filters=1280,
             dtype=jnp.float32,
+            init_stochastic_depth_rate=0.075,
         )
         variables = model_def.init(rng, jnp.ones((8, 224, 224, 3), jnp.float32))
 
@@ -44,7 +45,7 @@ class MobileNetV3Test(parameterized.TestCase):
         #   conv = 2
         self.assertLen(variables["params"], 3)
 
-        print(parameter_overview.get_parameter_overview(variables))
+        # print(parameter_overview.get_parameter_overview(variables))
 
     def test_mobilenet_v3_small_model(self):
         """Tests MobileNet V3 Small model definition and output (variables)."""
@@ -66,7 +67,7 @@ class MobileNetV3Test(parameterized.TestCase):
         #   conv = 2
         self.assertLen(variables["params"], 3)
 
-        print(parameter_overview.get_parameter_overview(variables))
+        # print(parameter_overview.get_parameter_overview(variables))
 
 
 if __name__ == "__main__":

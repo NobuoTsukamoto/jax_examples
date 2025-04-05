@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 import functools
 import time
@@ -12,6 +12,8 @@ from typing import Dict
 import math
 
 import input_pipeline
+import input_pipeline_for_efficientnet
+
 import jax
 import jax.numpy as jnp
 import ml_collections
@@ -95,10 +97,10 @@ def compute_metrics(logits, labels, num_classes, label_smoothing=0.0):
 def train_step(
     state,
     batch,
+    rng,
     learning_rate_fn,
     num_classes,
     label_smoothing=0.0,
-    rng=None,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
 ):
@@ -175,18 +177,26 @@ def train_step(
         )
         metrics["scale"] = dynamic_scale.scale
 
-    if state.ema_tx is not None:
-        _, new_ema_state = new_state.ema_tx.update(
-            new_state.params, new_state.ema_state
-        )
+    def maybe_update_ema(new_state):
+        _, new_ema_state = new_state.ema_tx.update(new_state.params, new_state.ema_state)
         new_state = new_state.replace(ema_state=new_ema_state)
 
         if with_batchnorm and new_state.ema_batch_stats is not None:
             _, new_ema_batch_stats = new_state.ema_tx.update(
                 new_state.batch_stats, new_state.ema_batch_stats
             )
-
             new_state = new_state.replace(ema_batch_stats=new_ema_batch_stats)
+        return new_state
+
+
+    cond = (state.ema_tx is not None and (state.step % gradient_accumulation_steps) == 0)
+    new_state = jax.lax.cond(
+        cond,
+        maybe_update_ema,           # true_fn
+        lambda x: x,                # false_fn (no-op)
+        new_state,                  # operand
+    )
+
     return new_state, metrics, next_rng
 
 
@@ -231,13 +241,23 @@ def prepare_tf_data(xs):
 
 
 def create_input_iter(dataset_builder, batch_size, dtype, train, config):
-    ds = input_pipeline.create_split(
-        dataset_builder,
-        batch_size=batch_size,
-        dtype=dtype,
-        train=train,
-        config=config,
-    )
+    if config.input_pipeline_type == "efficientnet":
+        ds = input_pipeline_for_efficientnet.create_split(
+            dataset_builder,
+            batch_size=batch_size,
+            dtype=dtype,
+            train=train,
+            config=config,
+        )
+    else:
+        ds = input_pipeline.create_split(
+            dataset_builder,
+            batch_size=batch_size,
+            dtype=dtype,
+            train=train,
+            config=config,
+        )
+
     it = map(prepare_tf_data, ds)
     it = jax_utils.prefetch_to_device(it, 2)
     return it
@@ -277,16 +297,23 @@ def create_train_state(
     ema_batch_stats = None
     if config.model_ema:
         logging.info(
-            "Model EMA %s, Decay rate: %f, Trainable weights only: %s",
+            "Model EMA %s, Decay rate: %f, Debias: %s, Trainable weights only: %s",
             config.model_ema_type,
             config.model_ema_decay,
+            config.model_ema_debias,
             config.model_ema_trainable_weights_only,
         )
 
         if config.model_ema_type == "v1":
-            ema_tx = optax.ema(config.model_ema_decay)
+            ema_tx = optax.ema(
+                config.model_ema_decay,
+                debias=config.model_ema_debias
+            )
         elif config.model_ema_type == "v2":
-            ema_tx = ema_v2(config.model_ema_decay)
+            ema_tx = ema_v2(
+                config.model_ema_decay,
+                debias=config.model_ema_debias
+            )
         else:
             logging.error("model_ema_type is incorrect")
 
@@ -444,7 +471,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         state, metrics, train_rng = p_train_step(
             state,
             batch,
-            rng=train_rng,
+            train_rng,
         )
         for h in hooks:
             h(step)
@@ -473,7 +500,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             eval_metrics = []
 
             if with_batchnorm and config.use_sync_batch_norm:
-                # sync batch statistics across replicas
+                # Sync batch statistics across replicas before evaluation or
+                # checkpointing.
                 state = sync_batch_stats(state)
 
             for _ in range(steps_per_eval):
@@ -516,7 +544,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                 writer.flush()
 
         if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-            if with_batchnorm and config.use_sync_batch_norm:
+            if with_batchnorm and not config.use_sync_batch_norm:
+                # Final synchronization of batch statistics before checkpointing.
+                # If SyncBN was not used during training, batch_stats may differ across
+                # devices.
+                # We synchronize here to ensure the saved model has consistent stats
+                # for evaluation and inference.
                 state = sync_batch_stats(state)
             save_checkpoint(checkpoint_manager, state)
 

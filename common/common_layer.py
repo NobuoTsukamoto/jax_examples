@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2023 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from functools import partial
@@ -297,6 +297,8 @@ class InvertedResBlockMobileNetV3(nn.Module):
     norm: ModuleDef
     act: Callable
     dtype: Any = jnp.float32
+    stochastic_depth: Optional[ModuleDef] = None
+    stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
     def __call__(self, x):
@@ -307,7 +309,7 @@ class InvertedResBlockMobileNetV3(nn.Module):
             SeBlock,
             conv=partial(nn.Conv, use_bias=True, dtype=self.dtype),
             act1=nn.relu,
-            act2=nn.hard_sigmoid
+            act2=nn.hard_sigmoid,
         )
 
         if self.expansion > 1.0:
@@ -353,6 +355,10 @@ class InvertedResBlockMobileNetV3(nn.Module):
         x = self.norm()(x)
 
         if in_filters == self.filters and self.strides == (1, 1):
+            if self.stochastic_depth and self.stochastic_depth_drop_rate > 0.0:
+                x = self.stochastic_depth(
+                    stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
+                )(x)
             x = x + inputs
 
         return x
@@ -368,8 +374,8 @@ class InvertedResBlockEfficientNet(nn.Module):
     se_ratio: float
     conv: ModuleDef
     norm: ModuleDef
-    stochastic_depth: ModuleDef = None
     act: Callable = None
+    stochastic_depth: Optional[ModuleDef] = None
     stochastic_depth_drop_rate: Optional[float] = 0.0
 
     @nn.compact
@@ -400,7 +406,7 @@ class InvertedResBlockEfficientNet(nn.Module):
             features=dw_filters,
             kernel_size=self.kernel_size,
             strides=self.strides,
-            padding="SAME" if self.strides == (1, 1) else "CIRCULAR",
+            padding="SAME",
             feature_group_count=dw_filters,
             name="DepthWise_Conv",
         )(x)
@@ -426,7 +432,7 @@ class InvertedResBlockEfficientNet(nn.Module):
         x = self.norm()(x)
 
         if in_filters == self.out_filters and self.strides == (1, 1):
-            if self.stochastic_depth_drop_rate > 0.0:
+            if self.stochastic_depth and self.stochastic_depth_drop_rate > 0.0:
                 x = self.stochastic_depth(
                     stochastic_depth_drop_rate=self.stochastic_depth_drop_rate
                 )(x)

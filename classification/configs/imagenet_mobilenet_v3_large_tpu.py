@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from configs import default as default_lib
@@ -39,12 +39,8 @@ def get_config():
     config.cache = True
     config.half_precision = True
 
-    config.batch_size = 4096
-
-    config.model_ema = True
-    config.model_ema_decay = 0.9999
-    config.model_ema_type = "v2"
-    config.model_ema_trainable_weights_only = False
+    config.batch_size = 1024
+    config.gradient_accumulation_steps = 4
 
     config.num_epochs = 700
 

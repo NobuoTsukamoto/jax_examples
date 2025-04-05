@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright (c) 2024 Nobuo Tsukamoto
+Copyright (c) 2025 Nobuo Tsukamoto
 This software is released under the MIT License.
 See the LICENSE file in the project root for more information.
 """
@@ -19,124 +19,143 @@ from absl import logging
 
     Besed on:
         https://github.com/google/flax/blob/main/examples/imagenet/input_pipeline.py
-        https://github.com/tensorflow/models/blob/master/official/vision/dataloaders/classification_input.py
+        https://github.com/tensorflow/tpu/blob/master/models/official/efficientnet/preprocessing.py
 """
 
 IMAGE_SIZE = 224
 CROP_FRACTION = 0.875
 
 
-def preprocess_for_train(
+def distorted_bounding_box_crop(
+    image_bytes,
+    bbox,
+    min_object_covered=0.1,
+    aspect_ratio_range=(0.75, 1.33),
+    area_range=(0.05, 1.0),
+    max_attempts=100,
+    scope=None,
+):
+    shape = tf.image.extract_jpeg_shape(image_bytes)
+    sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
+        shape,
+        bounding_boxes=bbox,
+        min_object_covered=min_object_covered,
+        aspect_ratio_range=aspect_ratio_range,
+        area_range=area_range,
+        max_attempts=max_attempts,
+        use_image_if_no_bounding_boxes=True,
+    )
+    bbox_begin, bbox_size, _ = sample_distorted_bounding_box
+
+    # Crop the image to the specified bounding box.
+    offset_y, offset_x, _ = tf.unstack(bbox_begin)
+    target_height, target_width, _ = tf.unstack(bbox_size)
+    crop_window = tf.stack([offset_y, offset_x, target_height, target_width])
+    image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+
+    return image
+
+
+def _at_least_x_are_equal(a, b, x):
+    """At least `x` of `a` and `b` `Tensors` are equal."""
+    match = tf.equal(a, b)
+    match = tf.cast(match, tf.int32)
+    return tf.greater_equal(tf.reduce_sum(match), x)
+
+
+def _decode_and_center_crop(
+    image_bytes, image_size, resize_method=tf.image.ResizeMethod.BICUBIC
+):
+    """Crops to center of image with padding then scales image_size."""
+    shape = tf.image.extract_jpeg_shape(image_bytes)
+    image_height = shape[0]
+    image_width = shape[1]
+
+    # crop_fraction = image_size / (image_size + crop_padding)
+    crop_padding = round(image_size * (1 / CROP_FRACTION - 1))
+    padded_center_crop_size = tf.cast(
+        (
+            (image_size / (image_size + crop_padding))
+            * tf.cast(tf.minimum(image_height, image_width), tf.float32)
+        ),
+        tf.int32,
+    )
+
+    offset_height = ((image_height - padded_center_crop_size) + 1) // 2
+    offset_width = ((image_width - padded_center_crop_size) + 1) // 2
+    crop_window = tf.stack(
+        [offset_height, offset_width, padded_center_crop_size, padded_center_crop_size]
+    )
+    image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+    image = tf.image.resize(image, [image_size, image_size], method=resize_method)
+    return image
+
+
+def _decode_and_random_crop(
+    image_bytes, image_size, resize_method=tf.image.ResizeMethod.BICUBIC
+):
+    """Make a random crop of image_size."""
+    bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
+    image = distorted_bounding_box_crop(
+        image_bytes,
+        bbox,
+        min_object_covered=0.1,
+        aspect_ratio_range=(3.0 / 4, 4.0 / 3.0),
+        area_range=(0.08, 1.0),
+        max_attempts=10,
+    )
+    original_shape = tf.image.extract_jpeg_shape(image_bytes)
+    bad = _at_least_x_are_equal(original_shape, tf.shape(image), 3)
+
+    image = tf.cond(
+        bad,
+        lambda: _decode_and_center_crop(image_bytes, image_size),
+        lambda: tf.image.resize(image, [image_size, image_size], method=resize_method),
+    )
+
+    return image
+
+
+def preprocess_for_train_efficientnet(
     image_bytes,
     config: ml_collections.ConfigDict,
     augmenter=None,
     random_erasing=None,
     dtype=tf.float32,
 ):
-    """Preprocesses the given image for training.
+    """EfficientNet-style preprocessing for training.
+
     Args:
-        image_bytes: `Tensor` representing an image binary of arbitrary size.
-        dtype: data type of the image.
-        image_size: image size.
+        image_bytes: tf.Tensor, image in bytes (JPEG).
+        config: ml_collections.ConfigDict containing 'image_size'.
+        dtype: final dtype (e.g. tf.float32 or tf.bfloat16)
+
     Returns:
-        A preprocessed image `Tensor`.
+        Preprocessed image tensor.
     """
-    image = tf.io.decode_image(image_bytes, channels=3)
-    image.set_shape([None, None, 3])
 
-    # Crops image.
-    cropped_image = tfm.vision.preprocess_ops.random_crop_image(
-        image, area_range=config.crop_area_range, seed=config.seed
-    )
-    image = tf.cond(
-        tf.reduce_all(tf.equal(tf.shape(cropped_image), tf.shape(image))),
-        lambda: tfm.vision.preprocess_ops.center_crop_image(image),
-        lambda: cropped_image,
-    )
+    # Decode and random crop (Inception-style)
+    image = _decode_and_random_crop(image_bytes, config.image_size)
 
-    # Random flips.
-    if config.aug_rand_horizontal_flip:
-        image = tf.image.random_flip_left_right(image, seed=config.seed)
-
-    # Color jitter.
-    if config.color_jitter > 0:
-        image = tfm.vision.color_jitter(
-            image,
-            config.color_jitter,
-            config.color_jitter,
-            config.color_jitter,
-            seed=config.seed,
-        )
-
-    # Resizes image.
-    image = tf.image.resize(
-        image,
-        [config.image_size, config.image_size],
-        method=tf.image.ResizeMethod.BILINEAR,
-    )
-    image.set_shape([config.image_size, config.image_size, 3])
+    # Random horizontal flip
+    image = tf.image.random_flip_left_right(image)
+    image = tf.reshape(image, [config.image_size, config.image_size, 3])
 
     # Apply autoaug or randaug.
     if augmenter is not None:
         image = augmenter.distort(image)
 
-    # Three augmentation.
-    if config.three_augment:
-        image = tfm.vision.augment.AutoAugment(
-            augmentation_name="deit3_three_augment",
-            translate_const=20,
-        ).distort(image)
+    # Convert to [0.0, 1.0]
+    image = tf.image.convert_image_dtype(image, dtype)
 
-    # Normalizes image with mean and std pixel values.
-    if config.normalize:
-        image = tfm.vision.preprocess_ops.normalize_image(
-            image,
-            offset=tfm.vision.preprocess_ops.MEAN_RGB,
-            scale=tfm.vision.preprocess_ops.STDDEV_RGB,
-        )
-
-    # Random erasing after the image has been normalized
-    if random_erasing is not None:
-        image = random_erasing.distort(image)
-
-    # Convert image to self._dtype.
-    image = tf.image.convert_image_dtype(image, dtype=dtype)
     return image
 
 
-def preprocess_for_eval(
+def preprocess_for_eval_efficientnet(
     image_bytes, config: ml_collections.ConfigDict, dtype=tf.float32
 ):
-    """Preprocesses the given image for evaluation.
-    Args:
-        image_bytes: `Tensor` representing an image binary of arbitrary size.
-        dtype: data type of the image.
-        image_size: image size.
-    Returns:
-        A preprocessed image `Tensor`.
-    """
-    image = tf.io.decode_image(image_bytes, channels=3)
-    image.set_shape([None, None, 3])
-
-    # Center crops.
-    image = tfm.vision.preprocess_ops.center_crop_image(
-        image, config.center_crop_fraction
-    )
-    image = tf.image.resize(
-        image,
-        [config.image_size, config.image_size],
-        method=tf.image.ResizeMethod.BILINEAR,
-    )
-    image.set_shape([config.image_size, config.image_size, 3])
-
-    # Normalizes image with mean and std pixel values.
-    if config.normalize:
-        image = tfm.vision.preprocess_ops.normalize_image(
-            image,
-            offset=tfm.vision.preprocess_ops.MEAN_RGB,
-            scale=tfm.vision.preprocess_ops.STDDEV_RGB,
-        )
-
+    image = _decode_and_center_crop(image_bytes, config.image_size)
+    image = tf.reshape(image, [config.image_size, config.image_size, 3])
     image = tf.image.convert_image_dtype(image, dtype=dtype)
     return image
 
@@ -263,7 +282,7 @@ def create_split(
 
     def decode_example(example):
         if train:
-            image = preprocess_for_train(
+            image = preprocess_for_train_efficientnet(
                 example["image"],
                 config,
                 augmenter=augmenter,
@@ -271,7 +290,7 @@ def create_split(
                 dtype=dtype,
             )
         else:
-            image = preprocess_for_eval(example["image"], config, dtype)
+            image = preprocess_for_eval_efficientnet(example["image"], config, dtype)
         return {"image": image, "label": example["label"]}
 
     def postprocess(example):

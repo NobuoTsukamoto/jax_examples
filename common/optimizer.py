@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2024 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2024 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 import ml_collections
@@ -70,25 +70,30 @@ def create_learning_rate_fn(config: ml_collections.ConfigDict, steps_per_epoch: 
     return schedule_fn
 
 
-def adamw_decay_mask_fn(params):
-    flat_params = traverse_util.flatten_dict(params)
-    flat_mask = {path: ("BatchNorm" not in path[-2]) for path in flat_params}
-    return traverse_util.unflatten_dict(flat_mask)
+def create_decay_mask_fn(exclude_layers):
+    def decay_mask_fn(params):
+        flat_params = traverse_util.flatten_dict(params)
+        flat_mask = {}
+        for path, _ in flat_params.items():
+            if path[-1] == "bias":
+                bias_mask = "bias" not in exclude_layers
+            else:
+                bias_mask = True
 
+            if len(path) >= 2:
+                other_mask = not any(
+                    excluded in path[-2]
+                    for excluded in exclude_layers
+                    if excluded != "bias"
+                )
+            else:
+                other_mask = True
 
-def decay_mask_fn(params):
-    flat_params = traverse_util.flatten_dict(params)
-    flat_mask = {
-        path: (
-            path[-1] != "bias"
-            and "LayerNorm" not in path[-2]
-            and "BatchNorm" not in path[-2]
-            and "DepthWise" not in path[-2]
-            and "LayerScale" not in path[-2]
-        )
-        for path in flat_params
-    }
-    return traverse_util.unflatten_dict(flat_mask)
+            flat_mask[path] = bias_mask and other_mask
+
+        return traverse_util.unflatten_dict(flat_mask)
+
+    return decay_mask_fn
 
 
 def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
@@ -98,8 +103,15 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
 
     if config.optimizer == "adamw":
         logging.info(
-            "weight decay rate: %f, esp: %f", config.weight_decay, config.adam_epsilon
+            "Adamw weight decay rate: %f, esp: %f",
+            config.weight_decay,
+            config.adam_epsilon,
         )
+        decay_mask_fn = None
+        if config.weight_decay > 0.0:
+            logging.info("Adamw decay mask: %s", config.weight_decay_exclude_layers)
+            decay_mask_fn = create_decay_mask_fn(config.weight_decay_exclude_layers)
+
         tx = optax.adamw(
             learning_rate=learning_rate_fn,
             weight_decay=config.weight_decay,
@@ -136,6 +148,11 @@ def create_optimizer(config: ml_collections.ConfigDict, learning_rate_fn):
             "l2 weight decay rate: %f",
             config.l2_weight_decay,
         )
+        decay_mask_fn = None
+        if config.l2_weight_decay > 0.0:
+            logging.info("l2 decay mask: %s", config.weight_decay_exclude_layers)
+            decay_mask_fn = create_decay_mask_fn(config.weight_decay_exclude_layers)
+
         tx = optax.chain(
             optax.add_decayed_weights(
                 weight_decay=config.l2_weight_decay * 0.5,
