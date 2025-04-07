@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2025 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2025 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 import functools
@@ -136,6 +136,18 @@ def create_eval_state(
     return state, with_batchnorm
 
 
+# pmean only works inside pmap because it needs an axis name.
+# This function will average the inputs across all devices.
+cross_replica_mean = jax.pmap(lambda x: lax.pmean(x, "x"), "x")
+
+
+def sync_batch_stats(state):
+    """Sync the batch statistics across replicas."""
+    # Each device has its own version of the running average batch statistics and
+    # we sync them before evaluation.
+    return state.replace(batch_stats=cross_replica_mean(state.batch_stats))
+
+
 def evaluate(config: ml_collections.ConfigDict, workdir: str):
     """Execute model training and evaluation loop.
     Args:
@@ -194,6 +206,10 @@ def evaluate(config: ml_collections.ConfigDict, workdir: str):
     state = jax_utils.replicate(state)
 
     logging.info("Restored checkpoint.")
+
+    if not config.use_sync_batch_norm:
+        logging.info("Sync batch satts.")
+        state = sync_batch_stats(state)
 
     p_eval_step = jax.pmap(
         functools.partial(
