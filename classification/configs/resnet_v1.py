@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-    Copyright (c) 2023 Nobuo Tsukamoto
-    This software is released under the MIT License.
-    See the LICENSE file in the project root for more information.
+Copyright (c) 2023 Nobuo Tsukamoto
+This software is released under the MIT License.
+See the LICENSE file in the project root for more information.
 """
 
 from configs import default as default_lib
@@ -29,12 +29,15 @@ def get_config():
 
     config.cache = False
     config.half_precision = False
-    config.batch_size = 4096
+    config.batch_size = 32
     config.shuffle_buffer_size = 16 * 1024
     config.label_smoothing = 0.1
-    config.model_ema_decay = 0.9999
+
+    # Model EMA
     config.model_ema = True
-    config.init_stochastic_depth_rate = 0.1
+    config.model_ema_decay = 0.9999
+    config.model_ema_type = "v2"
+    config.model_ema_trainable_weights_only = False
 
     config.num_epochs = 300
 
@@ -42,10 +45,10 @@ def get_config():
     config.aug_type = "randaug"
     config.randaug_num_layers = 2
     config.randaug_magnitude = 9
-    config.randaug_cutout_const = 40
+    config.randaug_cutout_const = 20.0
     config.randaug_translate_const = 100
     config.randaug_magnitude_std = 0.0
-    config.randaug_prob_to_apply = None
+    config.randaug_prob_to_apply = 0.5
     config.randaug_exclude_ops = ["Cutout"]
 
     # random erasing
