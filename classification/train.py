@@ -207,13 +207,15 @@ def eval_step(
 ):
     if model_ema:
         params = state.ema_state.ema
-        if state.ema_batch_stats is not None:
-            batch_stats = state.ema_batch_stats.ema
-        else:
-            batch_stats = state.batch_stats
+        if with_batchnorm:
+            if state.ema_batch_stats is not None:
+                batch_stats = state.ema_batch_stats.ema
+            else:
+                batch_stats = state.batch_stats
     else:
         params = state.params
-        batch_stats = state.batch_stats
+        if with_batchnorm:
+            batch_stats = state.batch_stats
 
     if with_batchnorm:
         variables = {"params": params, "batch_stats": batch_stats}
