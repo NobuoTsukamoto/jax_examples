@@ -34,7 +34,7 @@ def get_config():
     config.warmup_epochs = 20.0
 
     config.cache = True
-    config.half_precision = True
+    config.half_precision = False
     config.batch_size = 2048
     config.num_epochs = 300
 
