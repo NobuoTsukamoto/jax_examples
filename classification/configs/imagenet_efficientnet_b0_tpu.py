@@ -45,6 +45,7 @@ def get_config():
     config.model_ema = True
     config.model_ema_decay = 0.9999
     config.model_ema_type = "v2"
+    confib.model_ema_trainable_weights_only
 
     # randomarug
     config.aug_type = "randaug"
