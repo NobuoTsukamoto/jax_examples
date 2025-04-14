@@ -103,7 +103,6 @@ def train_step(
     label_smoothing=0.0,
     with_batchnorm=True,
     gradient_accumulation_steps=1,
-    model_ema=False,
 ):
     """Perform a single training step."""
 
@@ -178,7 +177,7 @@ def train_step(
         )
         metrics["scale"] = dynamic_scale.scale
 
-    def maybe_update_ema(new_state):
+    if state.ema_tx is not None:
         _, new_ema_state = new_state.ema_tx.update(
             new_state.params, new_state.ema_state
         )
@@ -188,16 +187,8 @@ def train_step(
             _, new_ema_batch_stats = new_state.ema_tx.update(
                 new_state.batch_stats, new_state.ema_batch_stats
             )
-            new_state = new_state.replace(ema_batch_stats=new_ema_batch_stats)
-        return new_state
 
-    if model_ema:
-        new_state = jax.lax.cond(
-            (state.step % gradient_accumulation_steps) == 0,
-            maybe_update_ema,  # true_fn
-            lambda x: x,  # false_fn (no-op)
-            new_state,  # operand
-        )
+            new_state = new_state.replace(ema_batch_stats=new_ema_batch_stats)
 
     return new_state, metrics, next_rng
 
@@ -430,7 +421,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             label_smoothing=config.label_smoothing,
             with_batchnorm=with_batchnorm,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
-            model_ema=config.model_ema,
         ),
         axis_name="batch",
     )
