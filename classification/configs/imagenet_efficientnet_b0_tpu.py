@@ -25,7 +25,10 @@ def get_config():
     config.weight_decay = 0.05
     config.l2_weight_decay = 0.0
     config.weight_decay_exclude_layers = [
+        "bias",
         "BatchNorm",
+        "DepthWise",
+        "LayerScale",
     ]
 
     # LR scheduler config
@@ -45,7 +48,7 @@ def get_config():
     config.model_ema = True
     config.model_ema_decay = 0.9999
     config.model_ema_type = "v2"
-    confib.model_ema_trainable_weights_only
+    config.model_ema_trainable_weights_only = False
 
     # randomarug
     config.aug_type = "randaug"
