@@ -74,7 +74,7 @@ def cross_entropy_loss(logits, labels, num_classes, label_smoothing=0.0):
         one_hot_labels = common_utils.onehot(labels, num_classes=num_classes)
 
         if label_smoothing > 0.0:
-            labels = optax.smooth_labels(one_hot_labels, label_smoothing)
+            one_hot_labels = optax.smooth_labels(one_hot_labels, label_smoothing)
 
     xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
     return jnp.mean(xentropy)
