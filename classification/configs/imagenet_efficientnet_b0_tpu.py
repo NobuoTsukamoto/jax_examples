@@ -21,62 +21,42 @@ def get_config():
     config.dataset = "imagenet2012:5.*.*"
 
     # optimizer config
-    config.optimizer = "adamw"
-    config.weight_decay = 0.05
-    config.l2_weight_decay = 0.0
-    config.weight_decay_exclude_layers = [
-        "bias",
-        "BatchNorm",
-        "DepthWise",
-        "LayerScale",
-    ]
+    config.optimizer = "rmsprop"
+    config.rmsprop_decay = 0.9
+    config.rmsprop_epsilon = 0.001
+    config.momentum = 0.9
+    config.rmsprop_initial_scale = 1.0
 
     # LR scheduler config
-    config.learning_rate = 0.002
-    config.end_learning_rate = 1e-6
-    config.warmup_epochs = 20.0
+    config.optimizer_schedule = "warmup_exponential_decay"
+    config.initial_learning_rate = 0.0
+    config.learning_rate = 0.128  # 0.016 * batch_size(2048) / 256
+    config.warmup_epochs = 5
+    config.exponential_decay_rate = 0.97
+    config.transition_steps = 1502  # 2.4 * steps_per_epoch (626)
+    config.lr_drop_staircase = True
 
     config.cache = True
     config.half_precision = False
     config.batch_size = 2048
-    config.num_epochs = 300
+    config.gradient_accumulation_steps = 1
 
-    config.init_stochastic_depth_rate = 0.1
-    config.use_sync_batch_norm = False
+    config.label_smoothing = 0.1
+    config.l2_weight_decay = 1e-5
+    config.weight_decay_exclude_layers = [
+        "BatchNorm",
+    ]
 
-    # Model EMA
+    # model ema
     config.model_ema = True
     config.model_ema_decay = 0.9999
     config.model_ema_type = "v2"
     config.model_ema_trainable_weights_only = False
 
-    # randomarug
-    config.aug_type = "randaug"
-    config.randaug_num_layers = 2
-    config.randaug_magnitude = 9
-    config.randaug_cutout_const = 20.0
-    config.randaug_translate_const = 100
-    config.randaug_magnitude_std = 0.0
-    config.randaug_prob_to_apply = 0.5
-    config.randaug_exclude_ops = ["Cutout"]
+    config.init_stochastic_depth_rate = 0.2
 
-    # random erasing
-    config.random_erasing = True
-    config.random_erasing_probability = 0.25
-    config.random_erasing_min_area = 0.02
-    config.random_erasing_max_area = 1 / 3
-    config.random_erasing_min_aspect = 0.3
-    config.random_erasing_max_aspect = None
-    config.random_erasing_min_count = 1
-    config.random_erasing_max_count = 1
-    config.random_erasing_trials = 10
+    config.use_sync_batch_norm = False
 
-    # mixup and cutmix
-    config.mixup_and_cutmix = True
-    config.mixup_and_cutmix_mixup_alpha = 0.8
-    config.mixup_and_cutmix_cutmix_alpha = 1.0
-    config.mixup_and_cutmix_prob = 1.0
-    config.mixup_and_cutmix_switch_prob = 0.5
-    config.mixup_and_cutmix_label_smoothing = 0.1
+    config.num_epochs = 350
 
     return config
